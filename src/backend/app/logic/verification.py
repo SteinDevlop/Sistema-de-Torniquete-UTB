@@ -2,12 +2,17 @@ from backend.app.models.access import MedioAcceso, AccesoRequest
 from backend.app.models.verificador_acceso import VerificadorAcceso
 from backend.app.logic.universal_controller_instance import universal_controller
 
+usuarios = [
+    {"id": 1, "Codigo": "ABC123", "nombre": "Juan"},
+    {"id": 2, "Codigo": "XYZ789", "nombre": "Maria"},
+    {"id": 3, "Codigo": "LMN456", "nombre": "Pedro"},
+]
 class VerificadorRFID(VerificadorAcceso):
     def verificar(self, data: dict) -> tuple[bool, int | None]:
         codigo = data.get("Codigo")
         #usuario=universal_controller.get_by_code(self, "tarjeta", codigo)
-        #Codigo de prueba
-        usuario={"id": 1, "nombre": "Usuario de prueba"}
+        #Alternativa de uso del controlador universal
+        usuario = next((user for user in usuarios if user["Codigo"] == codigo), None)
         if usuario:
             return True, usuario["id"]
         return False, None

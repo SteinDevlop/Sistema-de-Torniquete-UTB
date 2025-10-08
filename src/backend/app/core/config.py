@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()  # Carga las variables desde el archivo .env
 
 class Settings:
-    PROJECT_NAME: str = "Public Transit Agency"
+    PROJECT_NAME: str = "Torniquete API"
     # Corrige: quita espacios y comillas extras si hay en la variable de entorno
     ALLOWED_ORIGINS: list = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",")]
 

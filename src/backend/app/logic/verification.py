@@ -2,19 +2,22 @@ from backend.app.models.access import MedioAcceso, AccesoRequest
 from backend.app.models.verificador_acceso import VerificadorAcceso
 from backend.app.logic.universal_controller_instance import universal_controller
 
-usuarios = [
-    {"id": 1, "Codigo": "ABC123", "nombre": "Juan"},
-    {"id": 2, "Codigo": "XYZ789", "nombre": "Maria"},
-    {"id": 3, "Codigo": "LMN456", "nombre": "Pedro"},
-]
-class VerificadorRFID(VerificadorAcceso):
+class VerificadorRFID:
     def verificar(self, data: dict) -> tuple[bool, int | None]:
-        codigo = data.get("Codigo")
-        #usuario=universal_controller.get_by_code(self, "tarjeta", codigo)
-        #Alternativa de uso del controlador universal
-        usuario = next((user for user in usuarios if user["Codigo"] == codigo), None)
-        if usuario:
-            return True, usuario["id"]
+        """
+        Verifica si el RFID proporcionado pertenece a un usuario registrado en la tabla Biometria.
+        Args:
+            data (dict): Diccionario que contiene el valor del RFID bajo la clave 'rfid_tag'.
+        Returns:
+            tuple[bool, int | None]: (True, id_usuario) si se encuentra el RFID;
+            (False, None) en caso contrario.
+        """
+        rfid_tag = data.get("rfid_tag")
+        if not rfid_tag:
+            return False, None
+        biometria = universal_controller.get_by_field("Biometria", "rfid_tag", rfid_tag)
+        if biometria:
+            return True, biometria["id_usuario"]
         return False, None
 
 class VerificadorHuella(VerificadorAcceso):

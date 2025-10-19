@@ -9,7 +9,7 @@ class Settings:
     ALLOWED_ORIGINS: list = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",")]
 
     SECRET_KEY: str = os.getenv("SECRET_KEY")
-    ALGORITHM: str = os.getenv("ALGORITHM")
+    ALGORITHM: str = "HS256"
     HOST: str = os.getenv("HOST")
     PORT: str = os.getenv("PORT")
     DB: str = os.getenv("DB")

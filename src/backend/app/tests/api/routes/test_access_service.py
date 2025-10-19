@@ -3,10 +3,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.testclient import TestClient
 
 from backend.app.api.routes.access_service import app as access_router
-from backend.app.logic.universal_controller_server import UniversalController
+from backend.app.logic.universal_controller_instance import UniversalController
 from backend.app.core.conf import headers
 from backend.app.models.access import AccesoRequest, AccesoResponse
-
+from backend.app.models.biometria import BiometriaCreate
+import logging
+import base64
+import hashlib
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 # ===============================
 # CONFIGURACIÓN DE PRUEBAS
 # ===============================
@@ -33,51 +38,75 @@ def teardown_function():
     test_controller.clear_tables()
 
 
-# ===============================
-# MOCK: Reemplazar AccessService temporalmente
-# ===============================
-from backend.app.logic import access_logic
-
-class MockAccessService:
-    @staticmethod
-    def solicitar_acceso(request: AccesoRequest) -> dict:
-        if request.medio == "rfid" and request.data.get("rfid_tag") == "VALID123":
-            return {"autorizado": True, "mensaje": "Acceso concedido (RFID)"}
-
-# Inyectar mock
-access_logic.AccessService = MockAccessService
-
-
+app_for_test = FastAPI()
+app_for_test.include_router(access_router)
 # ===============================
 # PRUEBAS: ENDPOINTS DE ACCESO
 # ===============================
-
+def generar_template_y_hash(contenido: bytes):
+    template_b64 = base64.b64encode(contenido).decode()
+    hash_prefix = hashlib.sha256(contenido).hexdigest()[:8]
+    return template_b64, hash_prefix
+client = TestClient(app_for_test)
 def test_acceso_rfid_exitoso():
+    test_controller.add(BiometriaCreate(id_biometria=1, id_usuario=1, rfid_tag="VALID123"))
     response = client.post("/acceso/rfid", params={"rfid_tag": "VALID123"}, headers=headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["autorizado"] is True
-    assert "RFID" in data["mensaje"]
+    logger.info(f"Respuesta RFID exitosa: {data}")
+    assert data["status"] is True
 
 def test_acceso_rfid_fallido():
+    test_controller.add(BiometriaCreate(id_biometria=1, id_usuario=1, rfid_tag="VALID123"))
     response = client.post("/acceso/rfid", params={"rfid_tag": "INVALID"}, headers=headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["autorizado"] is False
+    assert data["status"] is False
 
 def test_acceso_huella_exitoso():
-    response = client.post("/acceso/huella", params={"vector": "HUELLA_OK"}, headers=headers)
+    """
+    Simula una huella válida registrada en base de datos y una nueva lectura idéntica.
+    """
+    # 🔹 Simulamos una plantilla binaria y la convertimos a Base64
+    template_b64, hash_prefix = generar_template_y_hash(b"plantilla_simulada_valida")
+    print(f"Template B64: {template_b64}, Hash Prefix: {hash_prefix}")
+    test_controller.add(
+    BiometriaCreate(
+        id_usuario=3,
+        template_huella=template_b64,
+        huella_hash=hash_prefix
+    )
+)
+    # 🔹 Enviamos la misma plantilla simulando el lector
+    response = client.post("/acceso/huella", params={"dispositivo_id": "SENSOR123","vector": template_b64,"fecha": "2025-10-19T12:00:00"}, headers=headers)
     assert response.status_code == 200
+
     data = response.json()
-    assert data["autorizado"] is True
-    assert "huella" in data["mensaje"].lower()
+    print(data)
+    assert data["status"] is True
+
 
 def test_acceso_huella_fallido():
-    response = client.post("/acceso/huella", params={"vector": "FAIL"}, headers=headers)
+    """
+    Simula una huella que no coincide con ninguna almacenada.
+    """
+    # 🔹 Simulamos una huella registrada
+    template_b64, hash_prefix = generar_template_y_hash(b"plantilla_simulada_valida")
+    test_controller.add(
+    BiometriaCreate(
+        id_usuario=3,
+        template_huella=template_b64,
+        huella_hash=hash_prefix
+    )
+)
+
+    # 🔹 Enviamos una huella diferente
+    template_falsa = base64.b64encode(b"huella_incorrecta").decode()
+    response = client.post("/acceso/huella", params={"dispositivo_id": "SENSOR123","vector": template_falsa,"fecha": "2025-10-19T12:00:00",}, headers=headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["autorizado"] is False
-
+    print(f"Respuesta HUELLAS fallida: {data}")
+    assert data["status"] is False
 def test_acceso_camara_exitoso():
     response = client.post("/acceso/camara", params={"vector": "ROSTRO_OK"}, headers=headers)
     assert response.status_code == 200

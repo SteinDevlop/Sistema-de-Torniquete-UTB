@@ -133,3 +133,10 @@ class UniversalController:
         if row:
             return dict(row)
         return None
+    def get_by_field_like(self, table: str, field: str, value_prefix: str) -> list[dict]:
+        """Retrieve records where a specific field starts with a given prefix."""
+        sql = f"SELECT * FROM {table} WHERE {field} LIKE ?"
+        like_pattern = f"{value_prefix}%"
+        self.cursor.execute(sql, (like_pattern,))
+        rows = self.cursor.fetchall()
+        return [dict(row) for row in rows]

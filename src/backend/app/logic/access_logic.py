@@ -7,7 +7,7 @@ class AccessService:
         verificador = VerificadorFactory.obtener(request.medio)
         autorizado, usuario_id = verificador.verificar(request.data)
 
-        status = "autorizado" if autorizado else "denegado"
+        status = True if autorizado else False
         return AccesoResponse(
             status=status,
             medio=request.medio,

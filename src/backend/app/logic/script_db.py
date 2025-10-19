@@ -44,6 +44,7 @@ CREATE TABLE Biometria (
     id_usuario INTEGER NOT NULL,
     vector_facial TEXT,
     huella_hash TEXT,
+    template_huella TEXT,
     rfid_tag TEXT,
     fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES Usuarios(id_usuario) ON DELETE CASCADE

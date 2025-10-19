@@ -16,7 +16,7 @@ class AccesoRequest(BaseModel):
 
 # Response estandarizada
 class AccesoResponse(BaseModel):
-    status: str
+    status: Optional[bool] = None
     medio: MedioAcceso
     usuario_id: Optional[int] = None
     mensaje: Optional[str] = None

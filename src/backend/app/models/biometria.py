@@ -9,6 +9,7 @@ class BiometriaCreate(BaseModel):
     huella_hash: Optional[str] = None
     rfid_tag: Optional[str] = None
     fecha_actualizacion: Optional[str] = None
+    template_huella: Optional[str] = None
 
     def to_dict(self):
         return self.model_dump()
@@ -20,6 +21,7 @@ class BiometriaCreate(BaseModel):
             "id_usuario": "INT",
             "vector_facial": "STR",
             "huella_hash": "STR",
+            "template_huella": "STR",
             "rfid_tag": "STR",
             "fecha_actualizacion": "STR"
         }

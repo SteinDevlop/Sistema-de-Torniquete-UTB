@@ -15,13 +15,15 @@ async def solicitar_acceso(rfid_tag: str):
     request = AccesoRequest(medio="rfid", data={"rfid_tag": rfid_tag})
     return AccessService.solicitar_acceso(request)
 @app.post("/acceso/huella", response_model=AccesoResponse)
-async def solicitar_acceso(vector: str):
+async def solicitar_acceso(dispositivo_id: str, vector: str, fecha: str = None ):
     """
     Endpoint para solicitar acceso con un medio específico.
     - medio: "huella"
-    - vector: vector de huella del usuario
+    - vector: template del usuario codigificado en base64
+    - dispositivo_id: ID del dispositivo que captura la huella
+    - fecha: Fecha y hora de la captura
     """
-    request = AccesoRequest(medio="huella", data={"vector": vector})
+    request = AccesoRequest(medio="huella", data={"dispositivo_id":dispositivo_id,"vector": vector,"fecha":fecha})
     return AccessService.solicitar_acceso(request)
 @app.post("/acceso/camara", response_model=AccesoResponse)
 async def solicitar_acceso(vector: str):

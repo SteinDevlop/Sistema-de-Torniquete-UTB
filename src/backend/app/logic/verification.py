@@ -174,9 +174,158 @@ class VerificadorHuella:
         return resultado, user_id
 
 class VerificadorCamara(VerificadorAcceso):
+    """
+    Verifica un embedding facial (vector de 128 decimales) comparando con candidatos
+    filtrados mediante un hash parcial (facial_hash).
+    Similar a VerificadorHuella pero para reconocimiento facial.
+    """
+
     def verificar(self, data: dict) -> tuple[bool, int | None]:
-        logger.debug("VerificadorCamara.verificar llamado (sin implementar). data keys=%s", list(data.keys()))
-        # Implementación pendiente
+        """
+        Args:
+            data (dict): {"vector": "[0.123, -0.456, ...]"} - String JSON con 128 decimales
+                        o Base64 del array numpy serializado
+
+        Returns:
+            (True, id_usuario) si hay coincidencia, (False, None) si no.
+        """
+        vector_str = data.get("vector") or data.get("embedding") or data.get("vector_facial")
+        logger.debug("VerificadorCamara.verificar recibido. keys=%s", list(data.keys()))
+        
+        if not vector_str:
+            logger.info("No se proporcionó vector facial en la petición.")
+            return False, None
+
+        try:
+            # Intentar decodificar como Base64 primero (formato numpy serializado)
+            try:
+                vector_bytes = base64.b64decode(vector_str)
+                embedding_capturado = np.frombuffer(vector_bytes, dtype=np.float32)
+                logger.info("Embedding decodificado desde Base64. Shape: %s", embedding_capturado.shape)
+            except Exception:
+                # Si falla, asumir que es un string JSON "[0.123, -0.456, ...]"
+                import json
+                embedding_list = json.loads(vector_str)
+                embedding_capturado = np.array(embedding_list, dtype=np.float32)
+                logger.info("Embedding parseado desde JSON. Shape: %s", embedding_capturado.shape)
+            
+            # Validar que sea un vector de 128 dimensiones
+            if embedding_capturado.shape[0] != 128:
+                logger.warning("El embedding facial debe tener 128 dimensiones, recibido: %d", embedding_capturado.shape[0])
+                return False, None
+                
+        except Exception as e:
+            logger.warning("Error procesando vector facial: %s", e)
+            return False, None
+
+        try:
+            # Serializar embedding para calcular hash (normalizar primero)
+            embedding_norm = embedding_capturado / (np.linalg.norm(embedding_capturado) + 1e-8)
+            embedding_bytes = embedding_norm.tobytes()
+            hash_prefix = hashlib.sha256(embedding_bytes).hexdigest()[:8]
+            logger.debug("Hash prefix calculado para embedding facial: %s", hash_prefix)
+        except Exception as e:
+            logger.exception("Error calculando hash del embedding facial: %s", e)
+            return False, None
+        
+        logger.info("Buscando candidatos con facial_hash similar: %s", hash_prefix)
+
+        try:
+            candidatos = universal_controller.get_by_field_like(
+                "Biometria", "facial_hash", hash_prefix
+            )
+            logger.info("Candidatos faciales recuperados: %d", len(candidatos) if candidatos else 0)
+            logger.debug("Candidatos sample: %s", str(candidatos[:3]) if candidatos else "[]")
+        except Exception as e:
+            logger.exception("Error consultando candidatos faciales en la DB: %s", e)
+            return False, None
+
+        if not candidatos:
+            logger.info("No se encontraron candidatos con facial_hash similar.")
+            return False, None
+
+        # Comparar embeddings usando similitud coseno
+        resultado, user_id = self._comparar_embeddings_faciales(embedding_capturado, candidatos)
+        logger.info("Resultado comparación facial final: matched=%s user_id=%s", str(resultado), str(user_id))
+        return resultado, user_id
+
+    def _comparar_embeddings_faciales(
+        self, embedding_capturado: np.ndarray, candidatos: list[dict]
+    ) -> tuple[bool, int | None]:
+        """
+        Compara el embedding facial capturado con los candidatos usando similitud coseno.
+        
+        Args:
+            embedding_capturado: Vector numpy de 128 dimensiones
+            candidatos: Lista de registros de Biometria con vector_facial
+            
+        Returns:
+            (True, id_usuario) si hay coincidencia >= umbral, (False, None) si no.
+        """
+        logger.info("Iniciando comparación de embeddings faciales: %d candidatos", len(candidatos))
+        
+        mejor_score = 0.0
+        mejor_usuario = None
+        
+        # Normalizar embedding capturado
+        embedding_capturado_norm = embedding_capturado / (np.linalg.norm(embedding_capturado) + 1e-8)
+
+        for idx, c in enumerate(candidatos):
+            usuario_id = c.get("id_usuario")
+            logger.debug("Comparando contra candidato facial %d: id_usuario=%s", idx, str(usuario_id))
+            
+            stored_vector = c.get("vector_facial")
+            if not stored_vector:
+                logger.debug("Candidato %s no tiene vector_facial almacenado, saltando.", str(usuario_id))
+                continue
+
+            try:
+                # Decodificar vector almacenado (puede ser Base64 o JSON)
+                try:
+                    stored_bytes = base64.b64decode(stored_vector)
+                    stored_embedding = np.frombuffer(stored_bytes, dtype=np.float32)
+                except Exception:
+                    import json
+                    stored_list = json.loads(stored_vector)
+                    stored_embedding = np.array(stored_list, dtype=np.float32)
+                
+                logger.debug("Candidato %s: embedding decodificado shape=%s", str(usuario_id), stored_embedding.shape)
+                
+                if stored_embedding.shape[0] != 128:
+                    logger.warning("Candidato %s tiene embedding con dimensión incorrecta: %d", 
+                                 str(usuario_id), stored_embedding.shape[0])
+                    continue
+                    
+            except Exception as e:
+                logger.warning("Error decodificando embedding del candidato %s: %s", str(usuario_id), e)
+                continue
+
+            try:
+                # Normalizar embedding almacenado
+                stored_embedding_norm = stored_embedding / (np.linalg.norm(stored_embedding) + 1e-8)
+                
+                # Calcular similitud coseno
+                score = float(np.dot(embedding_capturado_norm, stored_embedding_norm))
+                
+                logger.debug("Score facial con candidato %s = %f", str(usuario_id), score)
+                
+                if score > mejor_score:
+                    mejor_score = score
+                    mejor_usuario = usuario_id
+                    
+            except Exception as e:
+                logger.warning("Error comparando embeddings con candidato %s: %s", str(usuario_id), e)
+
+        # Umbral para reconocimiento facial (ajustable según precisión deseada)
+        UMBRAL = 0.70  # Para embeddings normalizados, 0.70 es un buen umbral
+        logger.info("Mejor score facial encontrado = %f (umbral=%f) -> usuario=%s", 
+                   mejor_score, UMBRAL, str(mejor_usuario))
+
+        if mejor_score >= UMBRAL:
+            logger.info("Coincidencia facial aceptada con usuario %s (score=%f)", str(mejor_usuario), mejor_score)
+            return True, mejor_usuario
+
+        logger.info("No hubo coincidencia facial válida. Mejor score=%f", mejor_score)
         return False, None
 
 class VerificadorFactory:

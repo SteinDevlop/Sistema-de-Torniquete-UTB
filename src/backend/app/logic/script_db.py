@@ -43,6 +43,7 @@ CREATE TABLE Biometria (
     id_biometria INTEGER PRIMARY KEY AUTOINCREMENT,
     id_usuario INTEGER NOT NULL,
     vector_facial TEXT,
+    facial_hash TEXT,
     huella_hash TEXT,
     template_huella TEXT,
     rfid_tag TEXT,

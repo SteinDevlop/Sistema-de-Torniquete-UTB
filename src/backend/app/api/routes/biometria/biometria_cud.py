@@ -4,6 +4,9 @@ from backend.app.models.biometria import BiometriaCreate, BiometriaOut
 from backend.app.logic.universal_controller_instance import universal_controller as controller
 import hashlib
 import base64
+import numpy as np
+import json
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -16,19 +19,45 @@ async def create_biometria(
     vector_facial: str = Form(None),
     rfid_tag: str = Form(None),
     fecha_actualizacion: str = Form(None),
-    template_huella: str = Form(...),
+    template_huella: str = Form(None),
 ):
     """
-    Crea un registro biométrico con huella codificada en Base64.
-    Genera hash parcial para búsqueda rápida.
+    Crea un registro biométrico.
+    - Si se proporciona template_huella, genera huella_hash
+    - Si se proporciona vector_facial, genera facial_hash
+    - Ambos pueden proporcionarse simultáneamente
     """
     try:
-        # 🔹 Calculamos hash parcial a partir del template (Base64 codificado)
-        huella_hash = hashlib.sha256(base64.b64decode(template_huella)).hexdigest()[:8]
+        huella_hash = None
+        facial_hash = None
+
+        # 🔹 Calcular hash de huella si se proporciona
+        if template_huella:
+            huella_hash = hashlib.sha256(base64.b64decode(template_huella)).hexdigest()[:8]
+            logger.info(f"Hash de huella calculado: {huella_hash}")
+
+        # 🔹 Calcular hash de vector facial si se proporciona
+        if vector_facial:
+            try:
+                # Intentar decodificar como Base64 (numpy serializado)
+                try:
+                    vector_bytes = base64.b64decode(vector_facial)
+                    embedding = np.frombuffer(vector_bytes, dtype=np.float32)
+                except Exception:
+                    # Si falla, asumir formato JSON
+                    embedding = np.array(json.loads(vector_facial), dtype=np.float32)
+                
+                # Normalizar y calcular hash
+                embedding_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
+                facial_hash = hashlib.sha256(embedding_norm.tobytes()).hexdigest()[:8]
+                logger.info(f"Hash facial calculado: {facial_hash}")
+            except Exception as e:
+                logger.warning(f"Error calculando facial_hash: {e}")
 
         item = BiometriaCreate(
             id_usuario=id_usuario,
             vector_facial=vector_facial,
+            facial_hash=facial_hash,
             huella_hash=huella_hash,
             rfid_tag=rfid_tag,
             fecha_actualizacion=fecha_actualizacion,
@@ -57,7 +86,7 @@ async def update_biometria(
     vector_facial: str = Form(None),
     rfid_tag: str = Form(None),
     fecha_actualizacion: str = Form(None),
-    template_huella: str = Form(...),
+    template_huella: str = Form(None),
 ):
     """
     Actualiza un registro biométrico existente.
@@ -67,12 +96,35 @@ async def update_biometria(
         if not existing:
             raise HTTPException(status_code=404, detail="Biometria no encontrada")
 
-        huella_hash = hashlib.sha256(base64.b64decode(template_huella)).hexdigest()[:8]
+        huella_hash = None
+        facial_hash = None
+
+        # 🔹 Calcular hash de huella si se proporciona
+        if template_huella:
+            huella_hash = hashlib.sha256(base64.b64decode(template_huella)).hexdigest()[:8]
+
+        # 🔹 Calcular hash de vector facial si se proporciona
+        if vector_facial:
+            try:
+                # Intentar decodificar como Base64 (numpy serializado)
+                try:
+                    vector_bytes = base64.b64decode(vector_facial)
+                    embedding = np.frombuffer(vector_bytes, dtype=np.float32)
+                except Exception:
+                    # Si falla, asumir formato JSON
+                    embedding = np.array(json.loads(vector_facial), dtype=np.float32)
+                
+                # Normalizar y calcular hash
+                embedding_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
+                facial_hash = hashlib.sha256(embedding_norm.tobytes()).hexdigest()[:8]
+            except Exception as e:
+                logger.warning(f"Error calculando facial_hash: {e}")
 
         item = BiometriaCreate(
             id_biometria=id_biometria,
             id_usuario=id_usuario,
             vector_facial=vector_facial,
+            facial_hash=facial_hash,
             huella_hash=huella_hash,
             rfid_tag=rfid_tag,
             fecha_actualizacion=fecha_actualizacion,

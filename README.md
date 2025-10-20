@@ -6,8 +6,10 @@ Sistema de control de acceso para la UTB basado en torniquetes con módulos de v
 - Backend (FastAPI)
   - API REST/ASGI que gestiona usuarios, biometría (CRUD), reglas de acceso y registros (AccessLog).
   - Lógica de verificación modular: VerificadorRFID, VerificadorHuella y VerificadorCamara/Facial.
+  - **✅ Reconocimiento facial implementado**: Recibe embeddings de 128 dimensiones desde ESP32.
   - Capa de persistencia abstracta (UniversalController) para operaciones add/get/update/delete.
   - Auditoría y logs estratégicos para trazabilidad de intentos y depuración.
+  - **Hash-indexing** para búsqueda rápida de candidatos (RFID, huella y facial).
 
 - Frontend / Dispositivos
   - Panel web o móvil para administración y visualización en tiempo real.
@@ -29,6 +31,26 @@ Sistema de control de acceso para la UTB basado en torniquetes con módulos de v
 - Extensiones posibles
   - Mostrar imágenes/vectores en dashboard, modo aprendizaje para modelos faciales, fallback por PIN.
   - Integración con sistemas institucionales (LDAP/AD) y balanceo de carga en producción.
+
+---
+
+## ✅ Estado de Implementación
+
+### Módulos Completados:
+- ✅ **RFID**: Búsqueda directa por tag
+- ✅ **Huella Dactilar**: Comparación de templates con hash-indexing y similitud coseno
+- ✅ **Reconocimiento Facial**: Comparación de embeddings de 128 dimensiones
+  - Soporta formato JSON y Base64
+  - Hash-indexing (SHA256) para búsqueda optimizada
+  - Similitud coseno normalizada
+  - Umbral configurable (default: 0.70)
+
+### Guías de Integración:
+- 📘 **[ESP32_INTEGRATION.md](./ESP32_INTEGRATION.md)** - Guía completa para enviar embeddings desde ESP32
+- 🧪 **Tests**: `src/backend/app/tests/test_reconocimiento_facial.py`
+- 📝 **Ejemplo**: `src/backend/app/examples/ejemplo_registro_facial.py`
+
+---
 
 ### Instrucciones para ejecutar el backend (Windows)
 

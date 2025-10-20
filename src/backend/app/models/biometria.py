@@ -6,6 +6,7 @@ class BiometriaCreate(BaseModel):
     id_biometria: Optional[int] = None
     id_usuario: Optional[int] = None
     vector_facial: Optional[str] = None
+    facial_hash: Optional[str] = None
     huella_hash: Optional[str] = None
     rfid_tag: Optional[str] = None
     fecha_actualizacion: Optional[str] = None
@@ -20,6 +21,7 @@ class BiometriaCreate(BaseModel):
             "id_biometria": "INT",
             "id_usuario": "INT",
             "vector_facial": "STR",
+            "facial_hash": "STR",
             "huella_hash": "STR",
             "template_huella": "STR",
             "rfid_tag": "STR",

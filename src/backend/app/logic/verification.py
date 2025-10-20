@@ -68,7 +68,8 @@ def _comparar_con_candidatos(
 
         try:
             logger.info(stored_b64)
-            stored_template = base64.b64decode(stored_b64)
+            padded_stored_b64 = stored_b64 + '=' * (-len(stored_b64) % 4)
+            stored_template = base64.b64decode(padded_stored_b64)
             logger.debug("Candidato %s: plantilla decodificada len=%d", str(usuario_id), len(stored_template))
         except Exception as e:
             logger.warning("Error decodificando plantilla del candidato %s: %s", str(usuario_id), e)
@@ -140,7 +141,8 @@ class VerificadorHuella:
             return False, None
 
         try:
-            template_capturada = base64.b64decode(vector_b64)
+            padded_vector = vector_b64 + '=' * (-len(vector_b64) % 4)
+            template_capturada = base64.b64decode(padded_vector)
             logger.info("Template capturada decodificada. len=%d", len(template_capturada))
         except Exception as e:
             logger.warning("Error decodificando vector de huella: %s", e)
@@ -199,7 +201,8 @@ class VerificadorCamara(VerificadorAcceso):
         try:
             # Intentar decodificar como Base64 primero (formato numpy serializado)
             try:
-                vector_bytes = base64.b64decode(vector_str)
+                padded_vector = vector_str + '=' * (-len(vector_str) % 4)
+                vector_bytes = base64.b64decode(padded_vector)
                 embedding_capturado = np.frombuffer(vector_bytes, dtype=np.float32)
                 logger.info("Embedding decodificado desde Base64. Shape: %s", embedding_capturado.shape)
             except Exception:
@@ -282,7 +285,8 @@ class VerificadorCamara(VerificadorAcceso):
             try:
                 # Decodificar vector almacenado (puede ser Base64 o JSON)
                 try:
-                    stored_bytes = base64.b64decode(stored_vector)
+                    padded_stored = stored_vector + '=' * (-len(stored_vector) % 4)
+                    stored_bytes = base64.b64decode(padded_stored)
                     stored_embedding = np.frombuffer(stored_bytes, dtype=np.float32)
                 except Exception:
                     import json

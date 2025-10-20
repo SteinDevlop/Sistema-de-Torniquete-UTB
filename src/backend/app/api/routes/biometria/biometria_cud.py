@@ -33,7 +33,9 @@ async def create_biometria(
 
         # 🔹 Calcular hash de huella si se proporciona
         if template_huella:
-            huella_hash = hashlib.sha256(base64.b64decode(template_huella)).hexdigest()[:8]
+            # Ajustar padding Base64 si es necesario
+            padded_template = template_huella + '=' * (-len(template_huella) % 4)
+            huella_hash = hashlib.sha256(base64.b64decode(padded_template)).hexdigest()[:8]
             logger.info(f"Hash de huella calculado: {huella_hash}")
 
         # 🔹 Calcular hash de vector facial si se proporciona
@@ -41,12 +43,12 @@ async def create_biometria(
             try:
                 # Intentar decodificar como Base64 (numpy serializado)
                 try:
-                    vector_bytes = base64.b64decode(vector_facial)
+                    padded_vector = vector_facial + '=' * (-len(vector_facial) % 4)
+                    vector_bytes = base64.b64decode(padded_vector)
                     embedding = np.frombuffer(vector_bytes, dtype=np.float32)
                 except Exception:
                     # Si falla, asumir formato JSON
                     embedding = np.array(json.loads(vector_facial), dtype=np.float32)
-                
                 # Normalizar y calcular hash
                 embedding_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
                 facial_hash = hashlib.sha256(embedding_norm.tobytes()).hexdigest()[:8]
@@ -101,19 +103,20 @@ async def update_biometria(
 
         # 🔹 Calcular hash de huella si se proporciona
         if template_huella:
-            huella_hash = hashlib.sha256(base64.b64decode(template_huella)).hexdigest()[:8]
+            padded_template = template_huella + '=' * (-len(template_huella) % 4)
+            huella_hash = hashlib.sha256(base64.b64decode(padded_template)).hexdigest()[:8]
 
         # 🔹 Calcular hash de vector facial si se proporciona
         if vector_facial:
             try:
                 # Intentar decodificar como Base64 (numpy serializado)
                 try:
-                    vector_bytes = base64.b64decode(vector_facial)
+                    padded_vector = vector_facial + '=' * (-len(vector_facial) % 4)
+                    vector_bytes = base64.b64decode(padded_vector)
                     embedding = np.frombuffer(vector_bytes, dtype=np.float32)
                 except Exception:
                     # Si falla, asumir formato JSON
                     embedding = np.array(json.loads(vector_facial), dtype=np.float32)
-                
                 # Normalizar y calcular hash
                 embedding_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
                 facial_hash = hashlib.sha256(embedding_norm.tobytes()).hexdigest()[:8]

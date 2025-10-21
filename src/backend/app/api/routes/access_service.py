@@ -14,16 +14,26 @@ async def solicitar_acceso(rfid_tag: str):
     """
     request = AccesoRequest(medio="rfid", data={"rfid_tag": rfid_tag})
     return AccessService.solicitar_acceso(request)
+from pydantic import BaseModel
+
+class HuellaRequest(BaseModel):
+    dispositivo_id: str
+    vector: str
+    fecha: str | None = None
+
 @app.post("/acceso/huella", response_model=AccesoResponse)
-async def solicitar_acceso(dispositivo_id: str, vector: str, fecha: str = None ):
+async def solicitar_acceso(req: HuellaRequest):
     """
-    Endpoint para solicitar acceso con un medio específico.
-    - medio: "huella"
-    - vector: template del usuario codigificado en base64
-    - dispositivo_id: ID del dispositivo que captura la huella
-    - fecha: Fecha y hora de la captura
+    Endpoint para solicitar acceso con huella dactilar.
     """
-    request = AccesoRequest(medio="huella", data={"dispositivo_id":dispositivo_id,"vector": vector,"fecha":fecha})
+    request = AccesoRequest(
+        medio="huella",
+        data={
+            "dispositivo_id": req.dispositivo_id,
+            "vector": req.vector,
+            "fecha": req.fecha
+        }
+    )
     return AccessService.solicitar_acceso(request)
 @app.post("/acceso/camara", response_model=AccesoResponse)
 async def solicitar_acceso_camara(dispositivo_id: str, vector: str, fecha: str = None):

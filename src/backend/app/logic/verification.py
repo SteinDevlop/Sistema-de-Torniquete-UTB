@@ -5,94 +5,12 @@ import numpy as np
 import base64
 import hashlib
 import logging
+from backend.app.models.biometria import BiometriaOut
+import cv2
+from skimage.metrics import structural_similarity as ssim
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-
-def _comparar_templates(self, t1: bytes, t2: bytes) -> float:
-    """
-    Calcula similitud (0–1) entre dos plantillas.
-    - Si los bytes son idénticos → similitud = 1.0 (modo test)
-    - Si no, usa similitud coseno (modo real)
-    """
-    try:
-        logger.debug("Entrando en _comparar_templates: len(t1)=%d, len(t2)=%d", len(t1), len(t2))
-    except Exception:
-        logger.debug("Entrando en _comparar_templates: no se pudo medir longitudes")
-
-    # Comparación exacta rápida (útil en tests)
-    if t1 == t2:
-        logger.info("Comparación exacta: plantillas idénticas -> score=1.0")
-        return 1.0
-
-    n = min(len(t1), len(t2))
-    if n == 0:
-        logger.warning("Comparación de templates: alguno tiene longitud 0, devolviendo 0.0")
-        return 0.0
-
-    try:
-        a = np.frombuffer(t1[:n], dtype=np.uint8).astype(np.float32)
-        b = np.frombuffer(t2[:n], dtype=np.uint8).astype(np.float32)
-        num = np.dot(a, b)
-        den = np.linalg.norm(a) * np.linalg.norm(b)
-        score = float(num / den) if den != 0 else 0.0
-        logger.debug("Score calculado (coseno): num=%f den=%f score=%f", num, den, score)
-        return score
-    except Exception as e:
-        logger.exception("Error calculando similitud entre templates: %s", e)
-        return 0.0
-
-def _comparar_con_candidatos(
-        self, template_capturada: bytes, candidatos: list[dict]
-    ) -> tuple[bool, int | None]:
-    """
-    Compara la plantilla capturada con una lista de candidatos filtrados.
-    Returns: (True, id_usuario) si hay coincidencia, (False, None) si no.
-    """
-    logger.info("Iniciando comparación con candidatos: %d candidatos recibidos", len(candidatos) if candidatos else 0)
-
-    if not candidatos:
-        logger.info("No se encontraron candidatos con hash similar.")
-        return False, None
-
-    mejor_score = 0.0
-    mejor_usuario = None
-
-    for idx, c in enumerate(candidatos):
-        usuario_id = c.get("id_usuario")
-        logger.debug("Comparando contra candidato %d: id_usuario=%s", idx, str(usuario_id))
-        stored_b64 = c.get("huella_template") or c.get("template_huella") or c.get("template")
-        if not stored_b64:
-            logger.debug("Candidato %s no tiene plantilla almacenada, saltando.", str(usuario_id))
-            continue
-
-        try:
-            logger.info(stored_b64)
-            padded_stored_b64 = stored_b64 + '=' * (-len(stored_b64) % 4)
-            stored_template = base64.b64decode(padded_stored_b64)
-            logger.debug("Candidato %s: plantilla decodificada len=%d", str(usuario_id), len(stored_template))
-        except Exception as e:
-            logger.warning("Error decodificando plantilla del candidato %s: %s", str(usuario_id), e)
-            continue
-
-        try:
-            score = _comparar_templates(self, template_capturada, stored_template)
-            logger.debug("Score con candidato %s = %f", str(usuario_id), score)
-            if score > mejor_score:
-                mejor_score = score
-                mejor_usuario = usuario_id
-        except Exception as e:
-            logger.warning("Error comparando templates con candidato %s: %s", str(usuario_id), e)
-
-    UMBRAL = 0.85
-    logger.info("Mejor score encontrado = %f (umbral=%f) -> usuario=%s", mejor_score, UMBRAL, str(mejor_usuario))
-
-    if mejor_score >= UMBRAL:
-        logger.info("Coincidencia aceptada con usuario %s (score=%f)", str(mejor_usuario), mejor_score)
-        return True, mejor_usuario
-
-    logger.info("No hubo coincidencia válida. Mejor score=%f", mejor_score)
-    return False, None
 
 class VerificadorRFID:
     def verificar(self, data: dict) -> tuple[bool, int | None]:
@@ -119,61 +37,91 @@ class VerificadorRFID:
         except Exception as e:
             logger.exception("Error buscando RFID en la DB: %s", e)
             return False, None
-
 class VerificadorHuella:
     """
-    Verifica una huella comparando con un subconjunto de candidatos
-    filtrados mediante un hash parcial (huella_hash).
+    Verifica una huella dactilar contra los templates almacenados.
+    Soporta tanto templates tipo imagen (SSIM) como vectores (correlación).
     """
+
+    def __init__(self, umbral_imagen=0.85, umbral_vector=0.98):
+        self.umbral_imagen = umbral_imagen
+        self.umbral_vector = umbral_vector
+
+    def _decode_image(self, b64_data: str):
+        """Intenta decodificar el base64 como imagen (grayscale)."""
+        try:
+            data = base64.b64decode(b64_data)
+            np_data = np.frombuffer(data, np.uint8)
+            img = cv2.imdecode(np_data, cv2.IMREAD_GRAYSCALE)
+            return img
+        except Exception:
+            return None
+
+    def _decode_vector(self, b64_data: str):
+        """Decodifica el base64 como vector de bytes."""
+        try:
+            data = base64.b64decode(b64_data)
+            return np.frombuffer(data, dtype=np.uint8).astype(np.float32)
+        except Exception:
+            return None
+
+    def _similitud_vectorial(self, v1: np.ndarray, v2: np.ndarray) -> float:
+        """Calcula similitud por correlación normalizada."""
+        min_len = min(len(v1), len(v2))
+        if min_len == 0:
+            return 0.0
+        v1, v2 = v1[:min_len], v2[:min_len]
+        return np.corrcoef(v1, v2)[0, 1]
 
     def verificar(self, data: dict) -> tuple[bool, int | None]:
         """
-        Args:
-            data (dict): {"vector": "<base64_template>"}
-
-        Returns:
-            (True, id_usuario) si hay coincidencia, (False, None) si no.
+        Verifica si la huella enviada coincide con alguna en la DB.
+        Retorna (True, id_usuario) o (False, None)
         """
-        vector_b64 = data.get("vector") or data.get("template") or data.get("template_huella")
-        logger.debug("VerificadorHuella.verificar recibido. keys=%s", list(data.keys()))
-        if not vector_b64:
-            logger.info("No se proporcionó vector de huella en la petición.")
+        vector_in_b64 = data.get("vector")
+        if not vector_in_b64:
             return False, None
 
-        try:
-            padded_vector = vector_b64 + '=' * (-len(vector_b64) % 4)
-            template_capturada = base64.b64decode(padded_vector)
-            logger.info("Template capturada decodificada. len=%d", len(template_capturada))
-        except Exception as e:
-            logger.warning("Error decodificando vector de huella: %s", e)
+        # 1️⃣ Intentar decodificar como imagen
+        img_sensor = self._decode_image(vector_in_b64)
+        usar_vector = img_sensor is None
+
+        registros_db = universal_controller.read_all(BiometriaOut())
+        if not registros_db:
             return False, None
 
-        try:
-            hash_prefix = hashlib.sha256(template_capturada).hexdigest()[:8]
-            logger.debug("Hash prefix calculado: %s", hash_prefix)
-        except Exception as e:
-            logger.exception("Error calculando hash de la plantilla capturada: %s", e)
-            return False, None
-        
-        logger.info("Buscando candidatos con huella_hash similar: %s", hash_prefix)
+        mejor_score = 0.0
+        mejor_id = None
 
-        try:
-            candidatos = universal_controller.get_by_field_like(
-                "Biometria", "huella_hash", hash_prefix
-            )
-            logger.info("Candidatos recuperados: %d", len(candidatos) if candidatos else 0)
-            logger.debug("Candidatos sample: %s", str(candidatos[:3]) if candidatos else "[]")
-        except Exception as e:
-            logger.exception("Error consultando candidatos en la DB: %s", e)
-            return False, None
+        for registro in registros_db:
+            tpl_b64 = registro.get("template_huella")
+            if not tpl_b64:
+                continue
 
-        if not candidatos:
-            logger.info("No se encontraron candidatos con hash similar.")
-            return False, None
+            if usar_vector:
+                # === Comparación tipo vector ===
+                v1 = self._decode_vector(vector_in_b64)
+                v2 = self._decode_vector(tpl_b64)
+                if v1 is None or v2 is None:
+                    continue
+                score = self._similitud_vectorial(v1, v2)
+                umbral = self.umbral_vector
+            else:
+                # === Comparación tipo imagen ===
+                img_db = self._decode_image(tpl_b64)
+                if img_db is None:
+                    continue
+                h, w = img_sensor.shape
+                img_db = cv2.resize(img_db, (w, h))
+                score = ssim(img_sensor, img_db)
+                umbral = self.umbral_imagen
 
-        resultado, user_id = _comparar_con_candidatos(self, template_capturada, candidatos)
-        logger.info("Resultado comparación final: matched=%s user_id=%s", str(resultado), str(user_id))
-        return resultado, user_id
+            if score > mejor_score:
+                mejor_score = score
+                mejor_id = registro["id_usuario"]
+
+        print(f"[DEBUG] Mejor similitud: {mejor_score:.3f} (modo {'vector' if usar_vector else 'imagen'})")
+        return (mejor_score >= umbral, mejor_id if mejor_score >= umbral else None)
 
 class VerificadorCamara(VerificadorAcceso):
     """

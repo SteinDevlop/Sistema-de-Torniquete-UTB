@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistema Torniquete UTB</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --azul-rey: #003366;
+            --azul-rey-claro: #004080;
+            --blanco: #ffffff;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .login-container {
+            background-color: var(--blanco);
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            padding: 2rem;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .login-logo {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+        }
+        
+        .logo-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .login-title {
+            color: var(--azul-rey);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .login-subtitle {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .form-control {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .form-control:focus {
+            border-color: var(--azul-rey);
+            box-shadow: 0 0 0 0.2rem rgba(0, 51, 102, 0.25);
+        }
+        
+        .btn-login {
+            background-color: var(--azul-rey);
+            border: none;
+            color: var(--blanco);
+            padding: 0.75rem;
+            border-radius: 5px;
+            width: 100%;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        
+        .btn-login:hover {
+            background-color: var(--azul-rey-claro);
+        }
+        
+        .alert {
+            border-radius: 5px;
+            padding: 0.75rem;
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .user-type-info {
+            font-size: 0.8rem;
+            color: #6c757d;
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .demo-accounts {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            font-size: 0.8rem;
+        }
+        
+        .demo-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--azul-rey);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="login-logo">
+                <!-- Aquí va tu imagen -->
+                <img src="logo.png" alt="Logo UTB" class="logo-img">
+            </div>
+            <h1 class="login-title">Sistema de Torniquete</h1>
+            <p class="login-subtitle">Ingrese sus credenciales para continuar</p>
+        </div>
+        
+        <form id="loginForm">
+            <div class="mb-3">
+                <input type="text" class="form-control" id="username" placeholder="Usuario" required>
+            </div>
+            <div class="mb-3">
+                <input type="password" class="form-control" id="password" placeholder="Contraseña" required>
+            </div>
+            <button type="submit" class="btn-login">Iniciar Sesión</button>
+            
+            <div class="alert alert-danger" id="errorAlert">
+                Usuario o contraseña incorrectos
+            </div>
+        </form>
+        
+        <div class="user-type-info">
+            Seleccione el tipo de usuario según sus permisos
+        </div>
+        
+        <div class="demo-accounts">
+            <div class="demo-title">Cuentas de demostración:</div>
+            <div><strong>Operador:</strong> usuario: operador | contraseña: operador123</div>
+            <div><strong>Administrador:</strong> usuario: admin | contraseña: admin123</div>
+        </div>
+    </div>
+
+    <script>
+        // Datos de usuarios locales
+        const usuarios = [
+            {
+                username: 'operador',
+                password: 'operador123',
+                tipo: 'operador',
+                nombre: 'Usuario Operador'
+            },
+            {
+                username: 'admin',
+                password: 'admin123', 
+                tipo: 'administrador',
+                nombre: 'Administrador del Sistema'
+            }
+        ];
+
+        // Manejar el envío del formulario
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorAlert = document.getElementById('errorAlert');
+            
+            // Verificar credenciales
+            const usuarioValido = usuarios.find(user => 
+                user.username === username && user.password === password
+            );
+            
+            if (usuarioValido) {
+                // Login exitoso
+                errorAlert.style.display = 'none';
+                
+                // Guardar datos de sesión
+                sessionStorage.setItem('usuario', JSON.stringify(usuarioValido));
+                
+                // Redirigir según el tipo de usuario
+                if (usuarioValido.tipo === 'operador') {
+                    window.location.href = 'operador.html';
+                } else if (usuarioValido.tipo === 'administrador') {
+                    window.location.href = 'admin.html';
+                }
+            } else {
+                // Mostrar error
+                errorAlert.style.display = 'block';
+            }
+        });
+
+        // Limpiar error al cambiar los campos
+        document.getElementById('username').addEventListener('input', function() {
+            document.getElementById('errorAlert').style.display = 'none';
+        });
+        
+        document.getElementById('password').addEventListener('input', function() {
+            document.getElementById('errorAlert').style.display = 'none';
+        });
+    </script>
+</body>
+</html>

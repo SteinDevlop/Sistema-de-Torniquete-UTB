@@ -1,0 +1,37 @@
+[
+  {
+    "id": "S1001",
+    "name": "María López",
+    "role": "Estudiante",
+    "status": "Activo",
+    "last_access": "2025-10-20T08:12:00Z"
+  },
+  {
+    "id": "P2001",
+    "name": "Dr. Ricardo Gómez",
+    "role": "Profesor",
+    "status": "Activo",
+    "last_access": "2025-10-19T16:45:00Z"
+  },
+  {
+    "id": "A3001",
+    "name": "Carolina Pérez",
+    "role": "Administrativo",
+    "status": "Inactivo",
+    "last_access": "2025-09-05T09:00:00Z"
+  },
+  {
+    "id": "S1002",
+    "name": "Juan Martínez",
+    "role": "Estudiante",
+    "status": "Activo",
+    "last_access": "2025-10-20T08:30:00Z"
+  },
+  {
+    "id": "S1003",
+    "name": "Ana Ruiz",
+    "role": "Estudiante",
+    "status": "Activo",
+    "last_access": "2025-10-18T12:10:00Z"
+  }
+]

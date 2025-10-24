@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+.bg-utb {
+  background-color: theme('colors.utb.DEFAULT');
+}

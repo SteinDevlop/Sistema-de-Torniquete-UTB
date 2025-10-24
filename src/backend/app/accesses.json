@@ -1,0 +1,30 @@
+[
+  {
+    "userId": "S1001",
+    "name": "María López",
+    "role": "Estudiante",
+    "datetime": "2025-10-20T08:12:00Z",
+    "result": "Permitido"
+  },
+  {
+    "userId": "P2001",
+    "name": "Dr. Ricardo Gómez",
+    "role": "Profesor",
+    "datetime": "2025-10-19T16:45:00Z",
+    "result": "Permitido"
+  },
+  {
+    "userId": "A3001",
+    "name": "Carolina Pérez",
+    "role": "Administrativo",
+    "datetime": "2025-09-05T09:00:00Z",
+    "result": "Denegado"
+  },
+  {
+    "userId": "S1002",
+    "name": "Juan Martínez",
+    "role": "Estudiante",
+    "datetime": "2025-10-20T08:30:00Z",
+    "result": "Permitido"
+  }
+]

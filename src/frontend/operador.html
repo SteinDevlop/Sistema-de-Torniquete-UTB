@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operador - Sistema Torniquete UTB</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --azul-rey: #003366;
+            --azul-rey-claro: #004080;
+            --verde-acceso: #28a745;
+            --rojo-denegado: #dc3545;
+            --blanco: #ffffff;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background-color: var(--azul-rey);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            color: var(--blanco) !important;
+            font-weight: 600;
+        }
+        
+        .user-info {
+            color: var(--blanco);
+            font-size: 0.9rem;
+        }
+        
+        .main-container {
+            padding: 2rem 0;
+        }
+        
+        .status-card {
+            background: var(--blanco);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .status-indicator {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 3rem;
+            color: var(--blanco);
+            transition: all 0.3s ease;
+        }
+        
+        .status-ready {
+            background-color: var(--azul-rey);
+        }
+        
+        .status-success {
+            background-color: var(--verde-acceso);
+        }
+        
+        .status-error {
+            background-color: var(--rojo-denegado);
+        }
+        
+        .verification-methods {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .method-card {
+            background: var(--blanco);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .method-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .method-icon {
+            font-size: 3rem;
+            color: var(--azul-rey);
+            margin-bottom: 1rem;
+        }
+        
+        .method-title {
+            color: var(--azul-rey);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .method-description {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .btn-method {
+            background-color: var(--azul-rey);
+            border: none;
+            color: var(--blanco);
+            padding: 0.75rem 1.5rem;
+            border-radius: 5px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+            width: 100%;
+        }
+        
+        .btn-method:hover {
+            background-color: var(--azul-rey-claro);
+        }
+        
+        .activity-log {
+            background: var(--blanco);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+        }
+        
+        .log-title {
+            color: var(--azul-rey);
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .log-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .log-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .log-item:last-child {
+            border-bottom: none;
+        }
+        
+        .log-success {
+            border-left: 4px solid var(--verde-acceso);
+        }
+        
+        .log-error {
+            border-left: 4px solid var(--rojo-denegado);
+        }
+        
+        .log-time {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        
+        .alert {
+            border-radius: 5px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .spinner {
+            width: 2rem;
+            height: 2rem;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--azul-rey);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .user-details {
+            background: #e9f7fe;
+            border-radius: 5px;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        /* Estilos para la interfaz de cámara */
+        .camera-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .camera-container {
+            background: var(--blanco);
+            border-radius: 15px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 800px;
+            text-align: center;
+            position: relative;
+        }
+
+        .camera-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .camera-preview {
+            width: 100%;
+            height: 400px;
+            background-color: #000;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--blanco);
+            font-size: 1.2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .face-frame {
+            position: absolute;
+            border: 3px solid var(--verde-acceso);
+            border-radius: 10px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+
+        .camera-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .btn-camera {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-capture {
+            background-color: var(--verde-acceso);
+            color: var(--blanco);
+        }
+
+        .btn-cancel {
+            background-color: #6c757d;
+            color: var(--blanco);
+        }
+
+        .camera-instructions {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+
+        .processing-indicator {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .detection-feedback {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: var(--blanco);
+            font-weight: 600;
+            display: none;
+        }
+
+        .feedback-success {
+            background-color: rgba(40, 167, 69, 0.8);
+            padding: 0.5rem;
+        }
+
+        .feedback-error {
+            background-color: rgba(220, 53, 69, 0.8);
+            padding: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Barra de navegación -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <img src="logo.png" alt="Logo UTB" height="30" class="d-inline-block align-top me-2">
+                Sistema de Torniquete
+            </a>
+            <div class="user-info">
+                <i class="fas fa-user-circle me-1"></i>
+                <span id="userName">Operador</span>
+                <button class="btn btn-sm btn-outline-light ms-3" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-container">
+        <!-- Estado del sistema -->
+        <div class="status-card">
+            <div class="status-indicator status-ready" id="statusIndicator">
+                <i class="fas fa-check"></i>
+            </div>
+            <h3 id="statusText">Sistema Listo</h3>
+            <p id="statusDescription">Seleccione un método de verificación</p>
+        </div>
+
+        <!-- Alertas -->
+        <div class="alert alert-success" id="successAlert">
+            <i class="fas fa-check-circle me-2"></i>
+            <span id="successMessage">Acceso permitido</span>
+        </div>
+        
+        <div class="alert alert-danger" id="errorAlert">
+            <i class="fas fa-times-circle me-2"></i>
+            <span id="errorMessage">Acceso denegado</span>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+            <p class="mt-2">Verificando identidad...</p>
+        </div>
+
+        <!-- Detalles del usuario -->
+        <div class="user-details" id="userDetails">
+            <h5><i class="fas fa-user me-2"></i>Información del Usuario</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Nombre:</strong> <span id="detailName">-</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>ID:</strong> <span id="detailId">-</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Score:</strong> <span id="detailScore">-</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Hora:</strong> <span id="detailTime">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Métodos de verificación -->
+        <div class="verification-methods">
+            <!-- RFID -->
+            <div class="method-card">
+                <div class="method-icon">
+                    <i class="fas fa-id-card"></i>
+                </div>
+                <h4 class="method-title">Verificación RFID</h4>
+                <p class="method-description">Acercar tarjeta RFID al lector para verificar acceso</p>
+                <button class="btn-method" onclick="simularRFID()">
+                    <i class="fas fa-rss me-2"></i>Simular RFID
+                </button>
+                <div class="mt-2">
+                    <small class="text-muted">Tag de prueba: <code>RFID-001</code></small>
+                </div>
+            </div>
+
+            <!-- Huella Dactilar -->
+            <div class="method-card">
+                <div class="method-icon">
+                    <i class="fas fa-fingerprint"></i>
+                </div>
+                <h4 class="method-title">Huella Dactilar</h4>
+                <p class="method-description">Colocar el dedo en el lector de huellas para identificación</p>
+                <button class="btn-method" onclick="simularHuella()">
+                    <i class="fas fa-fingerprint me-2"></i>Simular Huella
+                </button>
+                <div class="mt-2">
+                    <small class="text-muted">Template de prueba disponible</small>
+                </div>
+            </div>
+
+            <!-- Reconocimiento Facial -->
+            <div class="method-card">
+                <div class="method-icon">
+                    <i class="fas fa-camera"></i>
+                </div>
+                <h4 class="method-title">Reconocimiento Facial</h4>
+                <p class="method-description">Mire a la cámara para verificación facial automática</p>
+                <button class="btn-method" onclick="abrirCamara()">
+                    <i class="fas fa-camera me-2"></i>Iniciar Cámara
+                </button>
+                <div class="mt-2">
+                    <small class="text-muted">Embedding de 128 dimensiones</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Registro de actividad -->
+        <div class="activity-log">
+            <h4 class="log-title">
+                <i class="fas fa-history me-2"></i>Registro de Actividad
+            </h4>
+            <div class="log-list" id="activityLog">
+                <!-- Los registros se agregarán aquí dinámicamente -->
+                <div class="log-item log-success">
+                    <div>
+                        <strong>Acceso Permitido</strong>
+                        <div class="text-muted">Juan Pérez - RFID</div>
+                    </div>
+                    <div class="log-time">10:25 AM</div>
+                </div>
+                <div class="log-item log-error">
+                    <div>
+                        <strong>Acceso Denegado</strong>
+                        <div class="text-muted">Huella no reconocida</div>
+                    </div>
+                    <div class="log-time">10:18 AM</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Cámara para Reconocimiento Facial -->
+    <div class="camera-modal" id="cameraModal">
+        <div class="camera-container">
+            <div class="camera-header">
+                <h3><i class="fas fa-camera me-2"></i>Reconocimiento Facial</h3>
+                <p class="text-muted">Posicione su rostro dentro del marco para la verificación</p>
+            </div>
+            
+            <div class="camera-preview" id="cameraPreview">
+                <video id="cameraFeed" class="camera-feed" autoplay playsinline></video>
+                <canvas id="cameraCanvas" class="camera-feed" style="display: none;"></canvas>
+                <div class="face-frame" id="faceFrame"></div>
+                <div class="detection-feedback" id="detectionFeedback"></div>
+                <div id="cameraPlaceholder">
+                    <i class="fas fa-camera fa-3x mb-3"></i>
+                    <p>Iniciando cámara...</p>
+                </div>
+            </div>
+
+            <div class="processing-indicator" id="processingIndicator">
+                <div class="spinner"></div>
+                <p class="mt-2">Procesando imagen facial...</p>
+            </div>
+
+            <div class="camera-controls">
+                <button class="btn-camera btn-capture" onclick="capturarRostro()" id="btnCapture">
+                    <i class="fas fa-camera me-2"></i>Capturar Rostro
+                </button>
+                <button class="btn-camera btn-cancel" onclick="cerrarCamara()">
+                    <i class="fas fa-times me-2"></i>Cancelar
+                </button>
+            </div>
+
+            <div class="camera-instructions">
+                <p><i class="fas fa-lightbulb me-2"></i>Asegúrese de tener buena iluminación y mirar directamente a la cámara</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Datos de ejemplo para las simulaciones
+        const usuariosDemo = [
+            {
+                id: 'USR-001',
+                nombre: 'Juan Pérez',
+                rfid: 'RFID-001',
+                score: 0.95,
+                tipo: 'Estudiante'
+            },
+            {
+                id: 'USR-002', 
+                nombre: 'María García',
+                rfid: 'RFID-002',
+                score: 0.88,
+                tipo: 'Profesor'
+            },
+            {
+                id: 'USR-003',
+                nombre: 'Carlos López',
+                rfid: 'RFID-003',
+                score: 0.92,
+                tipo: 'Administrativo'
+            }
+        ];
+
+        // Elementos del DOM
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const statusDescription = document.getElementById('statusDescription');
+        const successAlert = document.getElementById('successAlert');
+        const errorAlert = document.getElementById('errorAlert');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const userDetails = document.getElementById('userDetails');
+        const activityLog = document.getElementById('activityLog');
+        const cameraModal = document.getElementById('cameraModal');
+        const cameraFeed = document.getElementById('cameraFeed');
+        const cameraCanvas = document.getElementById('cameraCanvas');
+        const faceFrame = document.getElementById('faceFrame');
+        const detectionFeedback = document.getElementById('detectionFeedback');
+        const processingIndicator = document.getElementById('processingIndicator');
+        const btnCapture = document.getElementById('btnCapture');
+
+        // Variables para la cámara
+        let stream = null;
+        let detectionInterval = null;
+        let isDetecting = false;
+
+        // Cargar nombre del usuario desde sessionStorage
+        document.addEventListener('DOMContentLoaded', function() {
+            const usuario = JSON.parse(sessionStorage.getItem('usuario'));
+            if (usuario && usuario.nombre) {
+                document.getElementById('userName').textContent = usuario.nombre;
+            }
+        });
+
+        // Simular verificación RFID
+        function simularRFID() {
+            iniciarVerificacion();
+            
+            setTimeout(() => {
+                const usuario = usuariosDemo[0]; // Juan Pérez
+                finalizarVerificacion(true, usuario, 'RFID');
+            }, 2000);
+        }
+
+        // Simular verificación de huella
+        function simularHuella() {
+            iniciarVerificacion();
+            
+            setTimeout(() => {
+                // 70% de probabilidad de éxito para demo
+                const exito = Math.random() > 0.3;
+                if (exito) {
+                    const usuario = usuariosDemo[1]; // María García
+                    finalizarVerificacion(true, usuario, 'Huella Dactilar');
+                } else {
+                    finalizarVerificacion(false, null, 'Huella Dactilar');
+                }
+            }, 3000);
+        }
+
+        // Abrir interfaz de cámara
+        async function abrirCamara() {
+            cameraModal.style.display = 'flex';
+            btnCapture.disabled = true;
+            
+            try {
+                // Solicitar acceso a la cámara
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user' 
+                    } 
+                });
+                
+                cameraFeed.srcObject = stream;
+                cameraFeed.style.display = 'block';
+                document.getElementById('cameraPlaceholder').style.display = 'none';
+                
+                // Iniciar detección de rostros simulada
+                iniciarDeteccionRostros();
+                
+            } catch (error) {
+                console.error('Error al acceder a la cámara:', error);
+                mostrarErrorCamara('No se pudo acceder a la cámara. Verifique los permisos.');
+            }
+        }
+
+        // Simular detección de rostros
+        function iniciarDeteccionRostros() {
+            isDetecting = true;
+            let detectionCount = 0;
+            
+            detectionInterval = setInterval(() => {
+                if (!isDetecting) return;
+                
+                detectionCount++;
+                
+                // Simular diferentes estados de detección
+                if (detectionCount === 1) {
+                    mostrarFeedback('Buscando rostro...', 'info');
+                } else if (detectionCount === 3) {
+                    mostrarMarcoRostro();
+                    mostrarFeedback('Rostro detectado', 'success');
+                    btnCapture.disabled = false;
+                } else if (detectionCount > 5) {
+                    // Simular pérdida ocasional de detección
+                    if (Math.random() > 0.7) {
+                        ocultarMarcoRostro();
+                        mostrarFeedback('Rostro perdido', 'error');
+                        btnCapture.disabled = true;
+                    }
+                }
+            }, 1000);
+        }
+
+        // Mostrar marco de rostro detectado
+        function mostrarMarcoRostro() {
+            const preview = document.getElementById('cameraPreview');
+            const frameSize = Math.min(preview.offsetWidth, preview.offsetHeight) * 0.6;
+            
+            faceFrame.style.width = frameSize + 'px';
+            faceFrame.style.height = frameSize + 'px';
+            faceFrame.style.left = (preview.offsetWidth - frameSize) / 2 + 'px';
+            faceFrame.style.top = (preview.offsetHeight - frameSize) / 2 + 'px';
+            faceFrame.style.display = 'block';
+        }
+
+        // Ocultar marco de rostro
+        function ocultarMarcoRostro() {
+            faceFrame.style.display = 'none';
+        }
+
+        // Mostrar feedback de detección
+        function mostrarFeedback(mensaje, tipo) {
+            detectionFeedback.textContent = mensaje;
+            detectionFeedback.className = 'detection-feedback';
+            
+            if (tipo === 'success') {
+                detectionFeedback.classList.add('feedback-success');
+            } else if (tipo === 'error') {
+                detectionFeedback.classList.add('feedback-error');
+            }
+            
+            detectionFeedback.style.display = 'block';
+            
+            // Ocultar después de 2 segundos
+            setTimeout(() => {
+                detectionFeedback.style.display = 'none';
+            }, 2000);
+        }
+
+        // Capturar rostro para reconocimiento
+        function capturarRostro() {
+            if (!stream) return;
+            
+            // Mostrar indicador de procesamiento
+            processingIndicator.style.display = 'block';
+            btnCapture.disabled = true;
+            isDetecting = false;
+            clearInterval(detectionInterval);
+            
+            // Simular procesamiento facial
+            setTimeout(() => {
+                processingIndicator.style.display = 'none';
+                cerrarCamara();
+                
+                // 80% de probabilidad de éxito para demo
+                const exito = Math.random() > 0.2;
+                if (exito) {
+                    const usuario = usuariosDemo[2]; // Carlos López
+                    finalizarVerificacion(true, usuario, 'Reconocimiento Facial');
+                } else {
+                    finalizarVerificacion(false, null, 'Reconocimiento Facial');
+                }
+            }, 3000);
+        }
+
+        // Cerrar cámara
+        function cerrarCamara() {
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+            }
+            
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            cameraModal.style.display = 'none';
+            cameraFeed.style.display = 'none';
+            document.getElementById('cameraPlaceholder').style.display = 'flex';
+            processingIndicator.style.display = 'none';
+            ocultarMarcoRostro();
+            detectionFeedback.style.display = 'none';
+            isDetecting = false;
+        }
+
+        // Mostrar error de cámara
+        function mostrarErrorCamara(mensaje) {
+            alert(mensaje);
+            cerrarCamara();
+        }
+
+        // Iniciar proceso de verificación
+        function iniciarVerificacion() {
+            // Ocultar alertas anteriores
+            successAlert.style.display = 'none';
+            errorAlert.style.display = 'none';
+            userDetails.style.display = 'none';
+            
+            // Mostrar loading
+            loadingIndicator.style.display = 'block';
+            
+            // Actualizar estado
+            statusIndicator.className = 'status-indicator status-ready';
+            statusIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            statusText.textContent = 'Verificando...';
+            statusDescription.textContent = 'Procesando identificación';
+        }
+
+        // Finalizar verificación
+        function finalizarVerificacion(exito, usuario, metodo) {
+            // Ocultar loading
+            loadingIndicator.style.display = 'none';
+            
+            const ahora = new Date();
+            const hora = ahora.toLocaleTimeString('es-ES', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            if (exito && usuario) {
+                // Acceso permitido
+                statusIndicator.className = 'status-indicator status-success';
+                statusIndicator.innerHTML = '<i class="fas fa-check"></i>';
+                statusText.textContent = 'Acceso Permitido';
+                statusDescription.textContent = `Bienvenido, ${usuario.nombre}`;
+                
+                // Mostrar alerta de éxito
+                document.getElementById('successMessage').textContent = 
+                    `Acceso permitido para ${usuario.nombre} via ${metodo}`;
+                successAlert.style.display = 'block';
+                
+                // Mostrar detalles del usuario
+                document.getElementById('detailName').textContent = usuario.nombre;
+                document.getElementById('detailId').textContent = usuario.id;
+                document.getElementById('detailScore').textContent = usuario.score;
+                document.getElementById('detailTime').textContent = hora;
+                userDetails.style.display = 'block';
+                
+                // Agregar al registro
+                agregarRegistroActividad(true, `${usuario.nombre} - ${metodo}`, hora);
+                
+            } else {
+                // Acceso denegado
+                statusIndicator.className = 'status-indicator status-error';
+                statusIndicator.innerHTML = '<i class="fas fa-times"></i>';
+                statusText.textContent = 'Acceso Denegado';
+                statusDescription.textContent = 'Identificación fallida';
+                
+                // Mostrar alerta de error
+                document.getElementById('errorMessage').textContent = 
+                    `Acceso denegado - ${metodo} no reconocido`;
+                errorAlert.style.display = 'block';
+                
+                // Agregar al registro
+                agregarRegistroActividad(false, `${metodo} no reconocido`, hora);
+            }
+            
+            // Restablecer después de 5 segundos
+            setTimeout(() => {
+                statusIndicator.className = 'status-indicator status-ready';
+                statusIndicator.innerHTML = '<i class="fas fa-check"></i>';
+                statusText.textContent = 'Sistema Listo';
+                statusDescription.textContent = 'Seleccione un método de verificación';
+                userDetails.style.display = 'none';
+            }, 5000);
+        }
+
+        // Agregar registro de actividad
+        function agregarRegistroActividad(exito, descripcion, hora) {
+            const logItem = document.createElement('div');
+            logItem.className = `log-item ${exito ? 'log-success' : 'log-error'}`;
+            
+            logItem.innerHTML = `
+                <div>
+                    <strong>${exito ? 'Acceso Permitido' : 'Acceso Denegado'}</strong>
+                    <div class="text-muted">${descripcion}</div>
+                </div>
+                <div class="log-time">${hora}</div>
+            `;
+            
+            activityLog.insertBefore(logItem, activityLog.firstChild);
+            
+            // Limitar a 10 registros
+            if (activityLog.children.length > 10) {
+                activityLog.removeChild(activityLog.lastChild);
+            }
+        }
+
+        // Cerrar sesión
+        function logout() {
+            sessionStorage.removeItem('usuario');
+            window.location.href = 'login.html';
+        }
+
+        // Simular algunos registros iniciales
+        document.addEventListener('DOMContentLoaded', function() {
+            // Agregar algunos registros de ejemplo
+            const ahora = new Date();
+            const horasEjemplo = [
+                '09:45:00',
+                '09:30:00', 
+                '09:15:00',
+                '09:00:00'
+            ];
+            
+            horasEjemplo.forEach((hora, index) => {
+                const exito = index % 3 !== 0; // Algunos denegados
+                const usuario = usuariosDemo[index % usuariosDemo.length];
+                const metodos = ['RFID', 'Huella Dactilar', 'Reconocimiento Facial'];
+                const metodo = metodos[index % metodos.length];
+                
+                const descripcion = exito ? 
+                    `${usuario.nombre} - ${metodo}` : 
+                    `${metodo} no reconocido`;
+                    
+                agregarRegistroActividad(exito, descripcion, hora);
+            });
+        });
+
+        // Cerrar cámara con ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && cameraModal.style.display === 'flex') {
+                cerrarCamara();
+            }
+        });
+    </script>
+</body>
+</html>

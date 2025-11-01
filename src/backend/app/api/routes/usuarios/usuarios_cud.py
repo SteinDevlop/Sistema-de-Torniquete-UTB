@@ -17,13 +17,34 @@ async def create_usuarios(
 ):
     try:
         item = UsuariosCreate(nombre_completo=nombre_completo, cargo=cargo, estado=estado, fecha_registro=fecha_registro)
-        controller.add(item)
-        logger.info(f"[POST /create] Usuarios creado exitosamente: {item}")
+        result = controller.add(item)
+        
+        # Intentar obtener el ID del resultado o buscar el último usuario creado
+        if hasattr(result, 'id_usuario'):
+            created_id = result.id_usuario
+        else:
+            # Buscar el usuario recién creado
+            all_usuarios = controller.get_all(UsuariosOut)
+            # Buscar por nombre y cargo (los últimos creados deberían estar al final)
+            matching = [u for u in all_usuarios if u.nombre_completo == nombre_completo and u.cargo == cargo]
+            if matching:
+                created_id = matching[-1].id_usuario  # Tomar el más reciente
+            else:
+                created_id = None
+        
+        logger.info(f"[POST /create] Usuarios creado exitosamente con ID: {created_id}")
+        
         return {
             "operation": "create",
             "success": True,
-            "data": UsuariosOut(**item.model_dump()).model_dump(),
-            "message": "Usuarios created successfully."
+            "data": {
+                "id_usuario": created_id,
+                "nombre_completo": nombre_completo,
+                "cargo": cargo,
+                "estado": estado,
+                "fecha_registro": fecha_registro
+            },
+            "message": "Usuario creado exitosamente."
         }
     except Exception as e:
         logger.error(f"[POST /create] Error interno: {str(e)}")

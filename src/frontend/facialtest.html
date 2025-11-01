@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Facial Test - STUTB</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 20px; }
+    pre.mask { max-width: 720px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Prueba Reconocimiento Facial — facialtest</h1>
+    <p class="text-muted">Página de pruebas: registrar usuarios con embedding sintético y validar acceso via <code>/acceso/camara</code>.</p>
+
+    <div class="row">
+      <div class="col-md-6">
+        <h4>1) Generar / Registrar usuario</h4>
+        <div class="mb-3">
+          <label class="form-label">ID Usuario</label>
+          <input id="inputUserId" class="form-control" type="number" value="1001">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">RFID (opcional)</label>
+          <input id="inputRfid" class="form-control" type="text" placeholder="RFID123">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Foto (opcional) — usar para generar embedding desde imagen</label>
+          <input id="inputRegImage" class="form-control" type="file" accept="image/*">
+        </div>
+        <div class="mb-3">
+          <button id="btnGenEmbed" class="btn btn-primary">Generar embedding sintético</button>
+          <button id="btnGenFromImage" class="btn btn-info">Generar embedding desde imagen</button>
+          <button id="btnRegUser" class="btn btn-success" disabled>Registrar en backend</button>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <h6>Embedding (previsualización)</h6>
+            <p id="embedPreview" class="small text-monospace">—</p>
+            <p class="small text-muted">Mostramos sólo un resumen (hash parcial y longitud) por privacidad.</p>
+            <div id="registerResult" class="mt-2"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <h4>2) Listar usuarios registrados</h4>
+        <p class="small text-muted">Los vectores se muestran parcialmente para no exponerlos por completo.</p>
+        <div class="mb-2">
+          <button id="btnRefreshList" class="btn btn-secondary btn-sm">Refrescar lista</button>
+        </div>
+        <div id="usersList" class="list-group" style="max-height:420px; overflow:auto;"></div>
+      </div>
+    </div>
+
+    <hr>
+    <div class="row">
+      <div class="col-md-6">
+        <h4>3) Verificar acceso (camara)</h4>
+        <p class="small text-muted">Puedes usar el embedding generado o seleccionar uno de los usuarios en la lista.</p>
+        <div class="mb-2">
+          <label class="form-label">Dispositivo ID</label>
+          <input id="inputDevice" class="form-control" type="text" value="web_test">
+        </div>
+        <div class="mb-2">
+          <button id="btnUseCurrentEmbed" class="btn btn-outline-primary btn-sm">Usar embedding generado</button>
+          <button id="btnUseSelectedUser" class="btn btn-outline-secondary btn-sm">Usar embedding seleccionado</button>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">O subir foto para verificar</label>
+          <input id="inputVerifyImage" class="form-control" type="file" accept="image/*">
+          <button id="btnGenVerifyFromImage" class="btn btn-outline-info btn-sm mt-2">Generar embedding y verificar</button>
+        </div>
+        <div class="mb-2">
+          <button id="btnCheckAccess" class="btn btn-warning">Solicitar acceso</button>
+        </div>
+        <div id="accessResult" class="mt-2"></div>
+      </div>
+      <div class="col-md-6">
+        <h4>Notas</h4>
+        <ul>
+          <li>Backend esperado en <code>http://localhost:8000</code>.</li>
+          <li>Si obtienes errores CORS, habilita CORS en el backend o sirve el frontend desde el mismo origen.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_ROOT = location.origin.includes('3000') ? 'http://localhost:8000' : 'http://localhost:8000';
+
+  let lastEmbeddingBase64 = null;
+  let lastEmbeddingArray = null; // Float32Array
+  let selectedUserVector = null;
+
+    function toBase64FromArrayBuffer(ab) {
+      const bytes = new Uint8Array(ab);
+      let binary = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    }
+
+    async function genSyntheticEmbedding(seed) {
+      // Genera 128 floats pseudoaleatorios usando Math.random (no determinístico por seed)
+      const arr = new Float32Array(128);
+      for (let i = 0; i < 128; i++) arr[i] = (Math.random() - 0.5) * 2.0; // approx [-1,1]
+      // Normalizar
+      let norm = 0.0; for (let v of arr) norm += v*v; norm = Math.sqrt(norm) + 1e-8;
+      for (let i = 0; i < arr.length; i++) arr[i] = arr[i] / norm;
+      return arr;
+    }
+
+    // Generar embedding determinístico a partir de bytes (imagen)
+    async function generateEmbeddingFromArrayBuffer(ab) {
+      // calcular SHA-256 para usar como semilla
+      const hashBuffer = await crypto.subtle.digest('SHA-256', ab);
+      const hashBytes = new Uint8Array(hashBuffer);
+      // usar los primeros 4 bytes como seed uint32
+      let seed = (hashBytes[0] << 24) | (hashBytes[1] << 16) | (hashBytes[2] << 8) | (hashBytes[3]);
+      seed = seed >>> 0;
+
+      // LCG pseudo-aleatorio
+      function rng() {
+        seed = (Math.imul(1664525, seed) + 1013904223) >>> 0;
+        return seed / 4294967296;
+      }
+
+      const arr = new Float32Array(128);
+      for (let i = 0; i < 128; i++) {
+        arr[i] = (rng() * 2.0) - 1.0;
+      }
+      // Normalizar
+      let norm = 0.0; for (let v of arr) norm += v*v; norm = Math.sqrt(norm) + 1e-8;
+      for (let i = 0; i < arr.length; i++) arr[i] = arr[i] / norm;
+      return arr;
+    }
+
+    async function generateEmbeddingFromFile(file) {
+      const ab = await file.arrayBuffer();
+      return await generateEmbeddingFromArrayBuffer(ab);
+    }
+
+    async function arrayBufferToHex(buffer) {
+      const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    document.getElementById('btnGenEmbed').addEventListener('click', async () => {
+      const arr = await genSyntheticEmbedding();
+      lastEmbeddingArray = arr;
+      const base64 = toBase64FromArrayBuffer(arr.buffer);
+      lastEmbeddingBase64 = base64;
+      const short = base64.slice(0, 24) + '...';
+      // compute facial hash like backend (normalize then sha256 first 8 hex)
+      const hashHex = (await arrayBufferToHex(arr.buffer)).slice(0,8);
+      document.getElementById('embedPreview').textContent = `len=${arr.length} | hash=${hashHex} | b64=${short}`;
+      document.getElementById('btnRegUser').disabled = false;
+    });
+
+    document.getElementById('btnGenFromImage').addEventListener('click', async () => {
+      const f = document.getElementById('inputRegImage').files[0];
+      if (!f) return alert('Selecciona una imagen primero');
+      document.getElementById('registerResult').innerHTML = 'Generando embedding desde imagen...';
+      try {
+        const arr = await generateEmbeddingFromFile(f);
+        lastEmbeddingArray = arr;
+        const base64 = toBase64FromArrayBuffer(arr.buffer);
+        lastEmbeddingBase64 = base64;
+        const short = base64.slice(0, 24) + '...';
+        const hashHex = (await arrayBufferToHex(arr.buffer)).slice(0,8);
+        document.getElementById('embedPreview').textContent = `len=${arr.length} | hash=${hashHex} | b64=${short}`;
+        document.getElementById('btnRegUser').disabled = false;
+        document.getElementById('registerResult').innerHTML = '';
+      } catch (e) { document.getElementById('registerResult').innerHTML = `<div class="text-danger">Error: ${e}</div>` }
+    });
+
+    document.getElementById('btnRegUser').addEventListener('click', async () => {
+      const id = Number(document.getElementById('inputUserId').value) || null;
+      const rfid = document.getElementById('inputRfid').value || null;
+      if (!id) { alert('Ingresa un id_usuario válido'); return; }
+      if (!lastEmbeddingBase64) { alert('Genera primero un embedding'); return; }
+
+      const form = new URLSearchParams();
+      form.append('id_usuario', id);
+      form.append('vector_facial', lastEmbeddingBase64);
+      if (rfid) form.append('rfid_tag', rfid);
+
+      document.getElementById('registerResult').innerHTML = 'Registrando...';
+      try {
+        const res = await fetch(API_ROOT + '/biometria/create', {
+          method: 'POST',
+          body: form,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          document.getElementById('registerResult').innerHTML = '<div class="text-success">Usuario registrado correctamente.</div>';
+          await refreshUsers();
+        } else {
+          document.getElementById('registerResult').innerHTML = `<div class="text-danger">Error: ${JSON.stringify(data)}</div>`;
+        }
+      } catch (e) {
+        document.getElementById('registerResult').innerHTML = `<div class="text-danger">Fetch error: ${e}</div>`;
+      }
+    });
+
+    async function refreshUsers() {
+      const list = document.getElementById('usersList');
+      list.innerHTML = 'Cargando...';
+      try {
+        const res = await fetch(API_ROOT + '/biometria/all');
+        const items = await res.json();
+        list.innerHTML = '';
+        if (!items || items.length === 0) {
+          list.innerHTML = '<div class="small text-muted">No hay usuarios registrados.</div>';
+          return;
+        }
+        items.forEach(it => {
+          const b64 = it.vector_facial || '';
+          const short = b64 ? (b64.slice(0,24) + '...') : '(sin vector)';
+          const facial_hash = it.facial_hash || '(no hash)';
+          const el = document.createElement('div');
+          el.className = 'list-group-item list-group-item-action';
+          el.innerHTML = `
+            <div class="d-flex w-100 justify-content-between">
+              <h6 class="mb-1">Usuario ${it.id_usuario} (biometria id: ${it.id_biometria || 'N/A'})</h6>
+              <small>${it.fecha_actualizacion || ''}</small>
+            </div>
+            <p class="mb-1"><strong>facial_hash:</strong> ${facial_hash} &nbsp; <strong>rfid:</strong> ${it.rfid_tag || ''}</p>
+            <p class="mb-1"><strong>vector (preview):</strong> <span class="mask">${short}</span></p>
+            <div>
+              <button class="btn btn-sm btn-outline-primary me-1" data-id="${it.id_usuario}" data-b64="${b64}" data-bioid="${it.id_biometria}">Seleccionar</button>
+              <button class="btn btn-sm btn-outline-secondary me-1" data-id="${it.id_usuario}" data-b64="${b64}" data-action="check">Verificar con este</button>
+              <button class="btn btn-sm btn-outline-danger" data-bioid="${it.id_biometria}" data-action="delete">Eliminar</button>
+            </div>
+          `;
+          list.appendChild(el);
+        });
+
+        // Handlers para botones: seleccionar, verificar y eliminar
+        list.querySelectorAll('button').forEach(btn => {
+          btn.addEventListener('click', async (ev) => {
+            const action = btn.getAttribute('data-action');
+            const b64 = btn.getAttribute('data-b64') || null;
+            const bioid = btn.getAttribute('data-bioid');
+            const uid = btn.getAttribute('data-id');
+            if (action === 'check') {
+              selectedUserVector = b64;
+              await doCheckAccess(b64);
+            } else if (action === 'delete') {
+              if (!bioid) return alert('No id_biometria disponible');
+              if (!confirm('Eliminar este registro biométrico?')) return;
+              try {
+                const form = new URLSearchParams(); form.append('id_biometria', bioid);
+                const res = await fetch(API_ROOT + '/biometria/delete', { method: 'POST', body: form, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+                const data = await res.json();
+                if (res.ok && data.success) { await refreshUsers(); document.getElementById('accessResult').innerHTML = '<div class="text-success">Eliminado</div>'; }
+                else document.getElementById('accessResult').innerHTML = `<div class="text-danger">Error al eliminar: ${JSON.stringify(data)}</div>`;
+              } catch (e) { document.getElementById('accessResult').innerHTML = `<div class="text-danger">Error: ${e}</div>`; }
+            } else {
+              // seleccionar
+              selectedUserVector = b64;
+              document.getElementById('accessResult').innerHTML = `<div class="text-info">Embedding del usuario ${uid} cargado (previsualizado).</div>`;
+            }
+          });
+        });
+
+      } catch (e) { list.innerHTML = `<div class="text-danger">Error al obtener usuarios: ${e}</div>`; }
+    }
+
+    document.getElementById('btnRefreshList').addEventListener('click', refreshUsers);
+
+    document.getElementById('btnUseCurrentEmbed').addEventListener('click', () => {
+      if (!lastEmbeddingBase64) return alert('Genera primero un embedding');
+      selectedUserVector = lastEmbeddingBase64;
+      document.getElementById('accessResult').innerHTML = '<div class="text-info">Usando embedding generado en memoria.</div>';
+    });
+
+    document.getElementById('btnUseSelectedUser').addEventListener('click', () => {
+      if (!selectedUserVector) return alert('Selecciona primero un usuario de la lista');
+      document.getElementById('accessResult').innerHTML = '<div class="text-info">Usando embedding del usuario seleccionado.</div>';
+    });
+
+    document.getElementById('btnCheckAccess').addEventListener('click', async () => {
+      if (!selectedUserVector) return alert('Selecciona o genera un embedding antes de verificar');
+      await doCheckAccess(selectedUserVector);
+    });
+
+    // Generar embedding desde imagen en la sección de verificación y ejecutar verificación
+    document.getElementById('btnGenVerifyFromImage').addEventListener('click', async () => {
+      const f = document.getElementById('inputVerifyImage').files[0];
+      if (!f) return alert('Selecciona una imagen primero');
+      document.getElementById('accessResult').innerHTML = 'Generando embedding desde imagen...';
+      try {
+        const arr = await generateEmbeddingFromFile(f);
+        const base64 = toBase64FromArrayBuffer(arr.buffer);
+        lastEmbeddingArray = arr;
+        lastEmbeddingBase64 = base64;
+        selectedUserVector = base64; // usar este vector para la verificación
+        const short = base64.slice(0, 24) + '...';
+        const hashHex = (await arrayBufferToHex(arr.buffer)).slice(0,8);
+        document.getElementById('embedPreview').textContent = `len=${arr.length} | hash=${hashHex} | b64=${short}`;
+        document.getElementById('accessResult').innerHTML = 'Embedding generado. Solicitando verificación...';
+        await doCheckAccess(base64);
+      } catch (e) {
+        document.getElementById('accessResult').innerHTML = `<div class="text-danger">Error: ${e}</div>`;
+      }
+    });
+
+    async function doCheckAccess(vectorB64) {
+      const dispositivo = document.getElementById('inputDevice').value || 'web_test';
+      // Construir query string porque el endpoint espera los parámetros como query
+      const fecha = new Date().toISOString();
+      const qs = `?dispositivo_id=${encodeURIComponent(dispositivo)}&vector=${encodeURIComponent(vectorB64)}&fecha=${encodeURIComponent(fecha)}`;
+
+      document.getElementById('accessResult').innerHTML = 'Solicitando acceso...';
+      try {
+        // Enviamos POST con los parámetros en la URL para que FastAPI los reciba como query params
+        const res = await fetch(API_ROOT + '/acceso/camara' + qs, {
+          method: 'POST'
+        });
+        const data = await res.json();
+        console.log('Respuesta /acceso/camara:', data);
+
+        // Interpretar respuesta y mostrar mensaje claro
+        const status = !!data.status;
+        const mensaje = data.mensaje || (status ? 'Acceso concedido' : 'Acceso denegado');
+        const usuario = data.usuario_id || null;
+
+        const badgeClass = status ? 'alert alert-success' : 'alert alert-danger';
+        let html = `<div class="${badgeClass}"><strong>${mensaje}</strong>`;
+        if (usuario) html += ` — usuario_id: <code>${usuario}</code>`;
+        html += `</div>`;
+
+        // Mostrar detalles JSON desplegable
+        html += `<details class="mt-2"><summary>Detalles (raw)</summary><pre class="small">${JSON.stringify(data, null, 2)}</pre></details>`;
+        document.getElementById('accessResult').innerHTML = html;
+      } catch (e) {
+        document.getElementById('accessResult').innerHTML = `<div class="text-danger">Error: ${e}</div>`;
+      }
+    }
+
+    // Auto-refresh list on load
+    refreshUsers();
+  </script>
+</body>
+</html>

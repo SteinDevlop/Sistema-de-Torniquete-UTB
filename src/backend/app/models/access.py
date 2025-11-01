@@ -20,3 +20,5 @@ class AccesoResponse(BaseModel):
     medio: MedioAcceso
     usuario_id: Optional[int] = None
     mensaje: Optional[str] = None
+    score: Optional[float] = None  # Score de similitud (para reconocimiento facial)
+    detalles_verificacion: Optional[Dict[str, Any]] = None  # Detalles adicionales de la verificación

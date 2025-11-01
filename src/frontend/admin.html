@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Sistema Torniquete UTB</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .navbar {
+            background: var(--card-bg);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--primary);
+        }
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg);
+            border-radius: 50px;
+        }
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.2s;
+        }
+        .stat-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transform: translateY(-2px);
+        }
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .stat-icon.blue { background: #dbeafe; color: #1e40af; }
+        .stat-icon.green { background: #d1fae5; color: #065f46; }
+        .stat-icon.yellow { background: #fef3c7; color: #92400e; }
+        .stat-icon.red { background: #fee2e2; color: #991b1b; }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .nav-tabs {
+            border: none;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+        .nav-tabs .nav-link {
+            border: none;
+            background: var(--card-bg);
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            color: var(--text-muted);
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .nav-tabs .nav-link:hover {
+            color: var(--primary);
+            background: #eff6ff;
+        }
+        .nav-tabs .nav-link.active {
+            background: var(--primary);
+            color: white;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .table-modern {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .table-modern table { margin: 0; }
+        .table-modern thead { background: var(--bg); }
+        .table-modern th {
+            padding: 1rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border);
+        }
+        .table-modern td {
+            padding: 1rem;
+            vertical-align: middle;
+        }
+        .table-modern tbody tr:hover { background: var(--bg); }
+        .badge {
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.8125rem;
+        }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-primary { background: #dbeafe; color: #1e40af; }
+        .badge-info { background: #cffafe; color: #155e75; }
+        .btn-action-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+            border-radius: 6px;
+        }
+        .form-control, .form-select {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.625rem 1rem;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        .spinner-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.3);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .spinner-overlay.show { display: flex; }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div class="spinner-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+    <nav class="navbar">
+        <div class="container-fluid px-4">
+            <div class="d-flex justify-content-between align-items-center w-100">
+                <div class="navbar-brand">
+                    <i class="fas fa-shield-alt me-2"></i>Sistema Torniquete UTB - Administración
+                </div>
+                <div class="user-badge">
+                    <div class="user-avatar" id="userAvatar">AD</div>
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.875rem;" id="userName">Administrador</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">Panel de Control</div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger ms-3" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="container-fluid px-4 mt-4">
+        <div class="row g-4 mb-4">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+                    <div class="stat-value" id="totalUsuarios">0</div>
+                    <div class="stat-label">Total Usuarios</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-value" id="accesosHoy">0</div>
+                    <div class="stat-label">Accesos Hoy</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon yellow"><i class="fas fa-fingerprint"></i></div>
+                    <div class="stat-value" id="totalBiometria">0</div>
+                    <div class="stat-label">Registros Biométricos</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon red"><i class="fas fa-door-closed"></i></div>
+                    <div class="stat-value" id="totalTorniquetes">0</div>
+                    <div class="stat-label">Torniquetes Activos</div>
+                </div>
+            </div>
+        </div>
+        <ul class="nav nav-tabs" id="mainTabs">
+            <li class="nav-item">
+                <button class="nav-link active" data-section="usuarios" onclick="showTab(`usuarios`)">
+                    <i class="fas fa-users me-2"></i>Gestión de Usuarios
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-section="registros" onclick="showTab(`registros`)">
+                    <i class="fas fa-clipboard-list me-2"></i>Registros de Acceso
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-section="torniquetes" onclick="showTab(`torniquetes`)">
+                    <i class="fas fa-door-open me-2"></i>Torniquetes
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-section="reportes" onclick="showTab(`reportes`)">
+                    <i class="fas fa-chart-bar me-2"></i>Reportes
+                </button>
+            </li>
+        </ul>
+        <div id="usuarios-tab" class="tab-content">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4>Gestión de Usuarios</h4>
+                <button class="btn btn-primary" onclick="mostrarModalCrear()">
+                    <i class="fas fa-plus me-2"></i>Nuevo Usuario
+                </button>
+            </div>
+            <div class="table-modern">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Cargo</th>
+                            <th>Fecha Registro</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaUsuarios">
+                        <tr><td colspan="6" class="empty-state"><i class="fas fa-inbox"></i><p>Cargando usuarios...</p></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div id="registros-tab" class="tab-content" style="display:none;">
+            <h4 class="mb-3">Registros de Acceso</h4>
+            <div class="card p-3 mb-3">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Fecha Desde</label>
+                        <input type="date" class="form-control" id="fechaDesde">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Fecha Hasta</label>
+                        <input type="date" class="form-control" id="fechaHasta">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Resultado</label>
+                        <select class="form-select" id="filtroResultado">
+                            <option value="">Todos</option>
+                            <option value="true">Permitidos</option>
+                            <option value="false">Denegados</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary w-100" onclick="filtrarRegistros()">
+                            <i class="fas fa-filter me-2"></i>Filtrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="table-modern">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Fecha/Hora</th>
+                            <th>Usuario</th>
+                            <th>Tipo Acceso</th>
+                            <th>Torniquete</th>
+                            <th>Resultado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaRegistros">
+                        <tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i><p>No hay registros</p></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div id="torniquetes-tab" class="tab-content" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4>Gestión de Torniquetes</h4>
+                <button class="btn btn-primary" onclick="mostrarModalTorniquete()">
+                    <i class="fas fa-plus me-2"></i>Nuevo Torniquete
+                </button>
+            </div>
+            <div class="table-modern">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Ubicación</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaTorniquetes">
+                        <tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i><p>Cargando...</p></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div id="reportes-tab" class="tab-content" style="display:none;">
+            <h4 class="mb-4">Reportes y Estadísticas</h4>
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card p-4">
+                        <h5 class="mb-3">Accesos por Método</h5>
+                        <div id="reporteMetodos">Cargando...</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-4">
+                        <h5 class="mb-3">Usuarios Más Activos</h5>
+                        <div id="reporteUsuarios">Cargando...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="modalUsuario" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalUsuarioTitle">Nuevo Usuario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editUserId">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre Completo *</label>
+                        <input type="text" class="form-control" id="modalNombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cargo *</label>
+                        <select class="form-select" id="modalCargo">
+                            <option value="">Seleccionar...</option>
+                            <option value="Estudiante">Estudiante</option>
+                            <option value="Profesor">Profesor</option>
+                            <option value="Administrativo">Administrativo</option>
+                            <option value="Visitante">Visitante</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Estado</label>
+                        <select class="form-select" id="modalEstado">
+                            <option value="true">Activo</option>
+                            <option value="false">Inactivo</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Fecha de Registro</label>
+                        <input type="date" class="form-control" id="modalFecha">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="guardarUsuario()">
+                        <i class="fas fa-save me-2"></i>Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="modalTorniquete" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nuevo Torniquete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre *</label>
+                        <input type="text" class="form-control" id="torniqueteNombre">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ubicación *</label>
+                        <input type="text" class="form-control" id="torniqueteUbicacion">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Estado</label>
+                        <select class="form-select" id="torniqueteEstado">
+                            <option value="true">Activo</option>
+                            <option value="false">Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="guardarTorniquete()">
+                        <i class="fas fa-save me-2"></i>Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_URL = "http://localhost:8000";
+        let currentModal = null;
+        function getAuthHeaders() {
+            const token = sessionStorage.getItem("token");
+            const headers = {};
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+            return headers;
+        }
+        function showLoading() { document.getElementById("loadingOverlay").classList.add("show"); }
+        function hideLoading() { document.getElementById("loadingOverlay").classList.remove("show"); }
+        function showTab(tabName) {
+            document.querySelectorAll(".tab-content").forEach(t => t.style.display = "none");
+            document.querySelectorAll(".nav-link").forEach(l => l.classList.remove("active"));
+            document.getElementById(tabName + "-tab").style.display = "block";
+            document.querySelector(`[data-section="${tabName}"]`).classList.add("active");
+            if (tabName === "usuarios") cargarUsuarios();
+            if (tabName === "registros") cargarRegistros();
+            if (tabName === "torniquetes") cargarTorniquetes();
+            if (tabName === "reportes") cargarReportes();
+        }
+        async function cargarEstadisticas() {
+            try {
+                const [usuarios, registros, biometria, torniquetes] = await Promise.all([
+                    fetch(`${API_URL}/usuarios/all`, { headers: getAuthHeaders() }).then(r => r.json()),
+                    fetch(`${API_URL}/registros/all`, { headers: getAuthHeaders() }).then(r => r.json()),
+                    fetch(`${API_URL}/biometria/all`, { headers: getAuthHeaders() }).then(r => r.json()),
+                    fetch(`${API_URL}/torniquetes/all`, { headers: getAuthHeaders() }).then(r => r.json())
+                ]);
+                const usrs = Array.isArray(usuarios) ? usuarios : (usuarios.data || []);
+                const regs = Array.isArray(registros) ? registros : (registros.data || []);
+                const bios = Array.isArray(biometria) ? biometria : (biometria.data || []);
+                const torns = Array.isArray(torniquetes) ? torniquetes : (torniquetes.data || []);
+                document.getElementById("totalUsuarios").textContent = usrs.length;
+                document.getElementById("totalBiometria").textContent = bios.length;
+                document.getElementById("totalTorniquetes").textContent = torns.filter(t => t.estado).length;
+                const hoy = new Date().toISOString().split("T")[0];
+                const accesosHoy = regs.filter(r => r.fecha_hora && r.fecha_hora.startsWith(hoy));
+                document.getElementById("accesosHoy").textContent = accesosHoy.length;
+            } catch (err) {
+                console.error("Error cargando estadísticas:", err);
+            }
+        }
+        async function cargarUsuarios() {
+            showLoading();
+            try {
+                const res = await fetch(`${API_URL}/usuarios/all`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                const usuarios = Array.isArray(data) ? data : (data.data || []);
+                const tbody = document.getElementById("tablaUsuarios");
+                if (usuarios.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><i class="fas fa-inbox"></i><p>No hay usuarios registrados</p></td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = usuarios.map(u => `
+                    <tr>
+                        <td><strong>${u.id_usuario}</strong></td>
+                        <td>${u.nombre_completo}</td>
+                        <td>${u.cargo}</td>
+                        <td>${u.fecha_registro || "-"}</td>
+                        <td><span class="badge ${u.estado ? "badge-success" : "badge-danger"}">${u.estado ? "Activo" : "Inactivo"}</span></td>
+                        <td>
+                            <div class="btn-action-group">
+                                <button class="btn btn-sm btn-primary" onclick="editarUsuario(${u.id_usuario})" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarUsuario(${u.id_usuario})" title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join("");
+            } catch (err) {
+                alert("Error cargando usuarios: " + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+        function mostrarModalCrear() {
+            document.getElementById("modalUsuarioTitle").textContent = "Nuevo Usuario";
+            document.getElementById("editUserId").value = "";
+            document.getElementById("modalNombre").value = "";
+            document.getElementById("modalCargo").value = "";
+            document.getElementById("modalEstado").value = "true";
+            document.getElementById("modalFecha").valueAsDate = new Date();
+            currentModal = new bootstrap.Modal(document.getElementById("modalUsuario"));
+            currentModal.show();
+        }
+        async function editarUsuario(id) {
+            showLoading();
+            try {
+                // Backend espera query parameter, no path parameter
+                const res = await fetch(`${API_URL}/usuarios/by_id?id_usuario=${id}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                const usuario = data || {};
+                
+                document.getElementById("modalUsuarioTitle").textContent = "Editar Usuario";
+                document.getElementById("editUserId").value = id;
+                document.getElementById("modalNombre").value = usuario.nombre_completo || "";
+                document.getElementById("modalCargo").value = usuario.cargo || "";
+                document.getElementById("modalEstado").value = String(usuario.estado);
+                document.getElementById("modalFecha").value = usuario.fecha_registro || "";
+                currentModal = new bootstrap.Modal(document.getElementById("modalUsuario"));
+                currentModal.show();
+            } catch (err) {
+                alert("Error: " + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+        async function guardarUsuario() {
+            const userId = document.getElementById("editUserId").value;
+            const nombre = document.getElementById("modalNombre").value.trim();
+            const cargo = document.getElementById("modalCargo").value;
+            const estado = document.getElementById("modalEstado").value === "true";
+            const fecha = document.getElementById("modalFecha").value;
+            if (!nombre || !cargo) {
+                alert("Nombre y cargo son obligatorios");
+                return;
+            }
+            showLoading();
+            try {
+                const formData = new FormData();
+                formData.append("nombre_completo", nombre);
+                formData.append("cargo", cargo);
+                formData.append("estado", estado);
+                formData.append("fecha_registro", fecha);
+                
+                let url = `${API_URL}/usuarios/create`;
+                
+                // Si estamos editando, agregar el ID al FormData y usar el endpoint /update
+                if (userId) {
+                    url = `${API_URL}/usuarios/update`;
+                    formData.append("id_usuario", userId);
+                }
+                
+                const res = await fetch(url, {
+                    method: "POST",  // Backend usa POST para ambos
+                    headers: getAuthHeaders(),
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("✅ Usuario guardado exitosamente");
+                    currentModal.hide();
+                    cargarUsuarios();
+                    cargarEstadisticas();
+                } else {
+                    alert("Error: " + (data.message || "No se pudo guardar"));
+                }
+            } catch (err) {
+                alert("Error: " + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+        async function eliminarUsuario(id) {
+            if (!confirm("¿Está seguro de eliminar este usuario?")) return;
+            showLoading();
+            try {
+                // Backend usa POST con FormData
+                const formData = new FormData();
+                formData.append("id_usuario", id);
+                
+                const res = await fetch(`${API_URL}/usuarios/delete`, {
+                    method: "POST",
+                    headers: getAuthHeaders(),
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("✅ Usuario eliminado");
+                    cargarUsuarios();
+                    cargarEstadisticas();
+                } else {
+                    alert("Error: " + (data.message || "No se pudo eliminar"));
+                }
+            } catch (err) {
+                alert("Error: " + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+        async function cargarRegistros() {
+            showLoading();
+            try {
+                const res = await fetch(`${API_URL}/registros/all`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                const registros = Array.isArray(data) ? data : (data.data || []);
+                const tbody = document.getElementById("tablaRegistros");
+                if (registros.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i><p>No hay registros</p></td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = registros.slice(-50).reverse().map(r => `
+                    <tr>
+                        <td>${r.fecha_hora || "-"}</td>
+                        <td>Usuario #${r.id_usuario || "-"}</td>
+                        <td><span class="badge badge-info">${r.tipo_acceso || "-"}</span></td>
+                        <td>Torniquete #${r.id_torniquete || "-"}</td>
+                        <td><span class="badge ${r.resultado ? "badge-success" : "badge-danger"}">${r.resultado ? "Permitido" : "Denegado"}</span></td>
+                    </tr>
+                `).join("");
+            } catch (err) {
+                console.error("Error:", err);
+            } finally {
+                hideLoading();
+            }
+        }
+        async function filtrarRegistros() {
+            alert("Filtro aplicado (implementar lógica específica según necesidad)");
+            cargarRegistros();
+        }
+        async function cargarTorniquetes() {
+            showLoading();
+            try {
+                const res = await fetch(`${API_URL}/torniquetes/all`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                const torniquetes = Array.isArray(data) ? data : (data.data || []);
+                const tbody = document.getElementById("tablaTorniquetes");
+                if (torniquetes.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i><p>No hay torniquetes</p></td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = torniquetes.map(t => `
+                    <tr>
+                        <td><strong>${t.id_torniquete}</strong></td>
+                        <td>${t.nombre || "-"}</td>
+                        <td>${t.ubicacion || "-"}</td>
+                        <td><span class="badge ${t.estado ? "badge-success" : "badge-danger"}">${t.estado ? "Activo" : "Inactivo"}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="eliminarTorniquete(${t.id_torniquete})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join("");
+            } catch (err) {
+                console.error("Error:", err);
+            } finally {
+                hideLoading();
+            }
+        }
+        function mostrarModalTorniquete() {
+            document.getElementById("torniqueteNombre").value = "";
+            document.getElementById("torniqueteUbicacion").value = "";
+            document.getElementById("torniqueteEstado").value = "true";
+            currentModal = new bootstrap.Modal(document.getElementById("modalTorniquete"));
+            currentModal.show();
+        }
+        async function guardarTorniquete() {
+            const nombre = document.getElementById("torniqueteNombre").value.trim();
+            const ubicacion = document.getElementById("torniqueteUbicacion").value.trim();
+            const estado = document.getElementById("torniqueteEstado").value === "true";
+            if (!nombre || !ubicacion) {
+                alert("Nombre y ubicación son obligatorios");
+                return;
+            }
+            showLoading();
+            try {
+                const formData = new FormData();
+                formData.append("nombre", nombre);
+                formData.append("ubicacion", ubicacion);
+                formData.append("estado", estado);
+                const res = await fetch(`${API_URL}/torniquetes/create`, {
+                    method: "POST",
+                    headers: getAuthHeaders(),
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(" Torniquete creado");
+                    currentModal.hide();
+                    cargarTorniquetes();
+                    cargarEstadisticas();
+                } else {
+                    alert("Error: " + (data.message || "No se pudo crear"));
+                }
+            } catch (err) {
+                alert("Error: " + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+        async function eliminarTorniquete(id) {
+            if (!confirm("¿Eliminar torniquete?")) return;
+            showLoading();
+            try {
+                const res = await fetch(`${API_URL}/torniquetes/delete/${id}`, {
+                    method: "DELETE",
+                    headers: getAuthHeaders()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(" Torniquete eliminado");
+                    cargarTorniquetes();
+                    cargarEstadisticas();
+                } else {
+                    alert("Error: " + (data.message || "No se pudo eliminar"));
+                }
+            } catch (err) {
+                alert("Error: " + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+        async function cargarReportes() {
+            document.getElementById("reporteMetodos").innerHTML = "<p>Funcionalidad de reportes disponible</p>";
+            document.getElementById("reporteUsuarios").innerHTML = "<p>Estadísticas en desarrollo</p>";
+        }
+        function logout() {
+            if (confirm("¿Cerrar sesión?")) {
+                sessionStorage.clear();
+                window.location.href = "login.html";
+            }
+        }
+        document.addEventListener("DOMContentLoaded", () => {
+            const user = JSON.parse(sessionStorage.getItem("usuario") || "{}");
+            if (user.nombre) {
+                document.getElementById("userName").textContent = user.nombre;
+                document.getElementById("userAvatar").textContent = user.nombre.charAt(0).toUpperCase();
+            }
+            const today = new Date().toISOString().split("T")[0];
+            document.getElementById("fechaDesde").value = today;
+            document.getElementById("fechaHasta").value = today;
+            cargarEstadisticas();
+            cargarUsuarios();
+        });
+    </script>
+</body>
+</html>

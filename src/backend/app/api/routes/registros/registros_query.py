@@ -12,7 +12,7 @@ app = APIRouter(prefix="/registros", tags=["registros"])
 async def get_all_registros():
     items = controller.read_all(RegistrosOut)
     logger.info(f"[GET /all] Número de Registros encontrados: {len(items)}")
-    return items
+    return {"success": True, "data": items}
 
 @app.get("/by_id")
 def get_registros_by_id(request: Request, id_registro: int = Query(...)):

@@ -3,8 +3,11 @@ import sqlite3
 from typing import Any
 
 # Definir la ruta a la base de datos
-PATH = os.getcwd()
-DIR_DATA = os.path.join(PATH, 'backend', 'app', 'data')
+# Obtener la ruta del archivo actual
+CURRENT_FILE = os.path.abspath(__file__)
+LOGIC_DIR = os.path.dirname(CURRENT_FILE)
+APP_DIR = os.path.dirname(LOGIC_DIR)
+DIR_DATA = os.path.join(APP_DIR, 'data')
 DB_FILE = os.path.join(DIR_DATA, 'data.db')
 
 class UniversalController:

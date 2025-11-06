@@ -12,7 +12,7 @@ app = APIRouter(prefix="/torniquetes", tags=["torniquetes"])
 async def get_all_torniquetes():
     items = controller.read_all(TorniquetesOut)
     logger.info(f"[GET /all] Número de Torniquetes encontrados: {len(items)}")
-    return items
+    return {"success": True, "data": items}
 
 @app.get("/by_id")
 def get_torniquetes_by_id(request: Request, id_torniquete: int = Query(...)):

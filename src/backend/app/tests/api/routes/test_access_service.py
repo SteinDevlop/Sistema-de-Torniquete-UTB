@@ -2,11 +2,11 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.testclient import TestClient
 from pathlib import Path
-from backend.app.api.routes.access_service import app as access_router
-from backend.app.logic.universal_controller_instance import UniversalController
-from backend.app.core.conf import headers
-from backend.app.models.access import AccesoRequest, AccesoResponse
-from backend.app.models.biometria import BiometriaCreate
+from app.api.routes.access_service import app as access_router
+from app.logic.universal_controller_instance import UniversalController
+from app.core.conf import headers
+from app.models.access import AccesoRequest, AccesoResponse
+from app.models.biometria import BiometriaCreate
 import logging
 import base64
 import numpy as np
@@ -23,7 +23,7 @@ test_controller = UniversalController()
 
 # Sobrescribir el controlador si se usa dentro del servicio
 # (solo necesario si AccessService lo usa internamente)
-# from backend.app.logic.access_logic import AccessService
+# from app.logic.access_logic import AccessService
 # AccessService.controller = test_controller
 
 # App de prueba

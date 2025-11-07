@@ -26,19 +26,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from backend.app.core.config import settings
-from backend.app.core.middlewares import add_middlewares
-from backend.app.logic.universal_controller_instance import universal_controller
-from backend.app.api.routes import access_service
-from backend.app.api.routes import liveness_service
-from backend.app.api.routes import auth
-from backend.app.api.routes.biometria import biometria_cud, biometria_query
-from backend.app.api.routes.historial_estado_usuario import historial_estado_usuario_cud, historial_estado_usuario_query
-from backend.app.api.routes.usuarios import usuarios_cud, usuarios_query
-from backend.app.api.routes.operarios import operarios_cud, operarios_query
-from backend.app.api.routes.registros_invalidos import registros_invalidos_cud, registros_invalidos_query
-from backend.app.api.routes.registros import registros_cud, registros_query
-from backend.app.api.routes.torniquetes import torniquetes_cud, torniquetes_query
+from app.core.config import settings
+from app.core.middlewares import add_middlewares
+from app.logic.universal_controller_instance import universal_controller
+from app.api.routes import access_service
+from app.api.routes import liveness_service
+from app.api.routes import auth
+from app.api.routes.biometria import biometria_cud, biometria_query
+from app.api.routes.historial_estado_usuario import historial_estado_usuario_cud, historial_estado_usuario_query
+from app.api.routes.usuarios import usuarios_cud, usuarios_query
+from app.api.routes.operarios import operarios_cud, operarios_query
+from app.api.routes.registros_invalidos import registros_invalidos_cud, registros_invalidos_query
+from app.api.routes.registros import registros_cud, registros_query
+from app.api.routes.torniquetes import torniquetes_cud, torniquetes_query
 
 # Montar archivos estáticos (se monta más abajo, después de crear `app`)
 
@@ -62,30 +62,6 @@ app = FastAPI(title=settings.PROJECT_NAME,lifespan=lifespan)
 
 # Añadir middlewares globales
 add_middlewares(app)
-
-# Montar carpeta STUTB-UI (raíz del repositorio) para servir el frontend estático
-try:
-    # __file__ -> src/backend/app/api/main.py
-    # parents[0]=api,1=app,2=backend,3=src,4=<repo root>
-    repo_root = Path(__file__).resolve().parents[4]
-    static_dir = repo_root / 'STUTB-UI'
-    if static_dir.exists():
-        # Montar archivos estáticos bajo /ui para no interferir con las rutas de la API
-        app.mount('/ui', StaticFiles(directory=str(static_dir), html=True), name='frontend')
-
-        # Servir directamente /facialtest.html desde el backend para compatibilidad con tests
-        from fastapi.responses import FileResponse
-
-        @app.get('/facialtest.html')
-        async def _facialtest():
-            target = static_dir / 'facialtest.html'
-            if target.exists():
-                return FileResponse(str(target))
-            return {"detail": "facialtest.html not found"}
-    else:
-        print(f"Static UI folder not found: {static_dir}")
-except Exception as e:
-    print(f"Error mounting static files: {e}")
 
 app.add_middleware(
     CORSMiddleware,

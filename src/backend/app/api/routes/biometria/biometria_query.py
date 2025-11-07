@@ -1,7 +1,7 @@
 import logging
 from fastapi import Query, Request, APIRouter, HTTPException
-from backend.app.models.biometria import BiometriaOut
-from backend.app.logic.universal_controller_instance import universal_controller as controller
+from app.models.biometria import BiometriaOut
+from app.logic.universal_controller_instance import universal_controller as controller
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

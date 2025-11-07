@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, status, Request, Security
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 from jose import jwt, JWTError
-from app.core.config import settings
+from backend.app.core.config import settings
 from typing import Dict, List
 import logging
 

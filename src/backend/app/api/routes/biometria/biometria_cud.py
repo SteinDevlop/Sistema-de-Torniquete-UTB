@@ -1,8 +1,8 @@
 import logging
 from fastapi import Form, HTTPException, APIRouter
-from app.models.biometria import BiometriaCreate, BiometriaOut
-from app.logic.universal_controller_instance import universal_controller as controller
-from app.logic.face_recognition import get_face_recognition_system
+from backend.app.models.biometria import BiometriaCreate, BiometriaOut
+from backend.app.logic.universal_controller_instance import universal_controller as controller
+from backend.app.logic.face_recognition import get_face_recognition_system
 import hashlib
 import base64
 import numpy as np

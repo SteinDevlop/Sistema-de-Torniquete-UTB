@@ -1,4 +1,4 @@
-from app.core.auth import encode_token
+from backend.app.core.auth import encode_token
 """
 Create a test token for authentication in the test environment.
 """

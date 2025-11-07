@@ -1,7 +1,7 @@
 import logging
 from fastapi import Query, Request, APIRouter
-from app.models.usuarios import UsuariosOut
-from app.logic.universal_controller_instance import universal_controller as controller
+from backend.app.models.usuarios import UsuariosOut
+from backend.app.logic.universal_controller_instance import universal_controller as controller
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

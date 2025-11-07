@@ -1,12 +1,12 @@
-from app.models.access import MedioAcceso, AccesoRequest
-from app.models.verificador_acceso import VerificadorAcceso
-from app.logic.universal_controller_instance import universal_controller
-from app.logic.face_recognition import get_face_recognition_system
+from backend.app.models.access import MedioAcceso, AccesoRequest
+from backend.app.models.verificador_acceso import VerificadorAcceso
+from backend.app.logic.universal_controller_instance import universal_controller
+from backend.app.logic.face_recognition import get_face_recognition_system
 import numpy as np
 import base64
 import hashlib
 import logging
-from app.models.biometria import BiometriaOut
+from backend.app.models.biometria import BiometriaOut
 import cv2
 from skimage.metrics import structural_similarity as ssim
 
@@ -235,7 +235,7 @@ class VerificadorCamara(VerificadorAcceso):
             # Si no hay candidatos por hash, buscar TODOS los registros con vector_facial
             if not candidatos or len(candidatos) == 0:
                 logger.warning("⚠️  No se encontraron candidatos por facial_hash. Buscando TODOS los usuarios con vector_facial...")
-                from app.models.biometria import BiometriaOut
+                from backend.app.models.biometria import BiometriaOut
                 todos_registros = universal_controller.read_all(BiometriaOut())
                 
                 logger.info(f"   Total de registros en DB: {len(todos_registros)}")

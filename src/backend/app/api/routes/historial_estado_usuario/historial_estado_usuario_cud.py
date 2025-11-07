@@ -1,7 +1,7 @@
 import logging
 from fastapi import Form, HTTPException, APIRouter
-from app.models.historial_estado_usuario import HistorialEstadoUsuarioCreate, HistorialEstadoUsuarioOut
-from app.logic.universal_controller_instance import universal_controller as controller
+from backend.app.models.historial_estado_usuario import HistorialEstadoUsuarioCreate, HistorialEstadoUsuarioOut
+from backend.app.logic.universal_controller_instance import universal_controller as controller
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

@@ -12,7 +12,7 @@ import os
 # Agregar el directorio raíz al path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from app.logic.verification import VerificadorCamara
+from backend.app.logic.verification import VerificadorCamara
 
 
 def generar_embedding_sintetico(seed=42):

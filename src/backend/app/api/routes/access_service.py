@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Form
-from app.models.access import AccesoRequest, AccesoResponse
-from app.logic.access_logic import AccessService
-from app.logic.verification import VerificadorHuella, VerificadorCamara, VerificadorRFID
+from backend.app.models.access import AccesoRequest, AccesoResponse
+from backend.app.logic.access_logic import AccessService
+from backend.app.logic.verification import VerificadorHuella, VerificadorCamara, VerificadorRFID
 from typing import Optional
 import logging
 

@@ -1,7 +1,7 @@
-from app.models.access import AccesoRequest, AccesoResponse
-from app.logic.verification import VerificadorFactory, VerificadorCamara
-from app.logic.universal_controller_instance import universal_controller as controller
-from app.models.registros import RegistrosCreate
+from backend.app.models.access import AccesoRequest, AccesoResponse
+from backend.app.logic.verification import VerificadorFactory, VerificadorCamara
+from backend.app.logic.universal_controller_instance import universal_controller as controller
+from backend.app.models.registros import RegistrosCreate
 from datetime import datetime
 import logging
 

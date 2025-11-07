@@ -26,19 +26,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from app.core.config import settings
-from app.core.middlewares import add_middlewares
-from app.logic.universal_controller_instance import universal_controller
-from app.api.routes import access_service
-from app.api.routes import liveness_service
-from app.api.routes import auth
-from app.api.routes.biometria import biometria_cud, biometria_query
-from app.api.routes.historial_estado_usuario import historial_estado_usuario_cud, historial_estado_usuario_query
-from app.api.routes.usuarios import usuarios_cud, usuarios_query
-from app.api.routes.operarios import operarios_cud, operarios_query
-from app.api.routes.registros_invalidos import registros_invalidos_cud, registros_invalidos_query
-from app.api.routes.registros import registros_cud, registros_query
-from app.api.routes.torniquetes import torniquetes_cud, torniquetes_query
+from backend.app.core.config import settings
+from backend.app.core.middlewares import add_middlewares
+from backend.app.logic.universal_controller_instance import universal_controller
+from backend.app.api.routes import access_service
+from backend.app.api.routes import liveness_service
+from backend.app.api.routes import auth
+from backend.app.api.routes.biometria import biometria_cud, biometria_query
+from backend.app.api.routes.historial_estado_usuario import historial_estado_usuario_cud, historial_estado_usuario_query
+from backend.app.api.routes.usuarios import usuarios_cud, usuarios_query
+from backend.app.api.routes.operarios import operarios_cud, operarios_query
+from backend.app.api.routes.registros_invalidos import registros_invalidos_cud, registros_invalidos_query
+from backend.app.api.routes.registros import registros_cud, registros_query
+from backend.app.api.routes.torniquetes import torniquetes_cud, torniquetes_query
 
 # Montar archivos estáticos (se monta más abajo, después de crear `app`)
 

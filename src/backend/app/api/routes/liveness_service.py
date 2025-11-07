@@ -10,8 +10,8 @@ from typing import Optional
 import base64
 import numpy as np
 import cv2
-from backend.app.logic.liveness_detection import get_liveness_detector
-from backend.app.logic.face_recognition import get_face_recognition_system
+from app.logic.liveness_detection import get_liveness_detector
+from app.logic.face_recognition import get_face_recognition_system
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

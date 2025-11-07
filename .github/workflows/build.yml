@@ -1,11 +1,10 @@
-name:  Docker Image CI
-on: 
-  workflow_dispatch:  
+name: Docker Image CI
+on:
+  workflow_dispatch: 
 
-jobs: 
-  build: 
-    runs-on:  ubuntu-latest
-
+jobs:
+  build:
+    runs-on: ubuntu-latest
     env: 
         SECRET_KEY: "supersecretkey"
         ALGORITHM: "HS256"
@@ -18,10 +17,8 @@ jobs:
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: pass
         POSTGRES_PORT: 5432
-
-    steps: 
-      - uses:  actions/checkout@v4
-
+    steps:
+      - uses: actions/checkout@v4
       # Construcción de la imagen con un nombre fijo
-      - name:  Build the Docker image
-        run:  docker build . --file Dockerfile --tag my-image-name:latest
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag my-image-name:latest

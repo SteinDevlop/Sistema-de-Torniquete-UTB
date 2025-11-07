@@ -24,4 +24,4 @@ jobs:
 
       # Construcción de la imagen con un nombre fijo
       - name:  Build the Docker image
-        run:  docker build . --file Dockerfile --tag my-image-name: latest
+        run:  docker build . --file Dockerfile --tag my-image-name:latest

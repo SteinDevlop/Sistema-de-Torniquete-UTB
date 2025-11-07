@@ -22,4 +22,4 @@ COPY src/ /app/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.app.api.main:app", "--reload"]
+CMD ["uvicorn", "backend.app.api.main:app", "--host", "0.0.0.0", "--reload"]

@@ -124,13 +124,8 @@ Sistema-de-Torniquete-UTB/### Instrucciones para ejecutar el backend (Windows)
 
 │   └── operador.html         # Panel operario1. Abrir PowerShell y colocarse en la carpeta `src`:
 
-└── requirements.txt   ```powershell
+└── requirements.txt   ```powershell   cd c:\Users\XXX\XXX\Sistema-de-Torniquete-UTB\src ```
 
-```   cd c:\Users\XXX\XXX\Sistema-de-Torniquete-UTB\src
-
-   ```
-
----
 
 2. Crear y activar un entorno virtual:
 
@@ -146,11 +141,7 @@ Sistema-de-Torniquete-UTB/### Instrucciones para ejecutar el backend (Windows)
 
 - **Cosine Similarity** para reconocimiento facial (70% umbral)3. Instalar dependencias:
 
-   ```powershell
-
----   pip install -r requirements.txt
-
-   ```
+   ```powershell pip install -r requirements.txt ```
 
 ## 🛠️ **Tecnologías**
 
@@ -168,10 +159,17 @@ Sistema-de-Torniquete-UTB/### Instrucciones para ejecutar el backend (Windows)
 
 5. Levantar el servidor FastAPI (modo desarrollo):
 
----   ```powershell
+```powershell
+python -m uvicorn backend.app.api.main:app --reload --host 0.0.0.0 --port 8000 
+   ```
 
-   python -m uvicorn backend.app.api.main:app --reload --host 0.0.0.0 --port 8000
+6. Levantar el apartado frontend
 
+Dirigete a la carpeta src/frontend
+
+``` python -m http.server 3000 ```
+
+Puedes conectarte desde el frontend desde http://localhost:3000/login.html
 ## 📞 **Soporte**   ```
 
 

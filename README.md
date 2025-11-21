@@ -58,11 +58,11 @@ Sistema de control de acceso para la UTB basado en torniquetes con módulos de v
 
 
 
-### **1. Iniciar Backend**- Extensiones posibles
+### **1. Iniciar Backend**-
 
-```powershell  - Mostrar imágenes/vectores en dashboard, modo aprendizaje para modelos faciales, fallback por PIN.
+```powershell
 
-python -m uvicorn backend.app.api.main:app --reload --host 0.0.0.0 --port 8000 --app-dir src  - Integración con sistemas institucionales (LDAP/AD) y balanceo de carga en producción.
+python -m uvicorn backend.app.api.main:app --reload --host 0.0.0.0 --port 8000 --app-dir src  
 
 ```
 
@@ -72,11 +72,14 @@ python -m uvicorn backend.app.api.main:app --reload --host 0.0.0.0 --port 8000 -
 
 ```powershell## ✅ Estado de Implementación
 
-cd STUTB-UI
+cd src/frontend
 
-python -m http.server 3000### Módulos Completados:
+python -m http.server 3000
+```
 
-```- ✅ **RFID**: Búsqueda directa por tag
+### Módulos Completados:
+
+- ✅ **RFID**: Búsqueda directa por tag
 
 - ✅ **Huella Dactilar**: Comparación de templates con hash-indexing y similitud coseno
 
@@ -106,6 +109,7 @@ python -m http.server 3000### Módulos Completados:
 
 ```
 
+
 Sistema-de-Torniquete-UTB/### Instrucciones para ejecutar el backend (Windows)
 
 ├── src/backend/app/          # Backend FastAPI
@@ -116,7 +120,7 @@ Sistema-de-Torniquete-UTB/### Instrucciones para ejecutar el backend (Windows)
 
 │   └── models/               # Modelos Pydantic- Git (opcional)
 
-├── STUTB-UI/                 # Frontend- Tener el archivo `.env` con las variables necesarias en la carpeta `src`.
+├── src/frontend/                 # Frontend- Tener el archivo `.env` con las variables necesarias en la carpeta `src`.
 
 │   ├── login.html            # Autenticación
 
@@ -126,6 +130,7 @@ Sistema-de-Torniquete-UTB/### Instrucciones para ejecutar el backend (Windows)
 
 └── requirements.txt   ```powershell   cd c:\Users\XXX\XXX\Sistema-de-Torniquete-UTB\src ```
 
+```
 
 2. Crear y activar un entorno virtual:
 
@@ -163,13 +168,7 @@ Sistema-de-Torniquete-UTB/### Instrucciones para ejecutar el backend (Windows)
 python -m uvicorn backend.app.api.main:app --reload --host 0.0.0.0 --port 8000 
    ```
 
-6. Levantar el apartado frontend
 
-Dirigete a la carpeta src/frontend
-
-``` python -m http.server 3000 ```
-
-Puedes conectarte desde el frontend desde http://localhost:3000/login.html
 ## 📞 **Soporte**   ```
 
 

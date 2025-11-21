@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8000";
+import API_URL from './api_root.js';
         let currentUserId = null;
         let cameraStream = null;
         

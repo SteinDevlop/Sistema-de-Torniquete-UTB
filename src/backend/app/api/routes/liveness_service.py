@@ -193,3 +193,48 @@ async def reset_liveness_session(session_id: str = Form(...)):
     except Exception as e:
         logger.exception(f"Error reseteando sesión: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/detect-face-realtime")
+async def detect_face_realtime(frame_b64: str = Form(...)):
+    """
+    Detecta rostro en un frame y retorna las coordenadas del cuadro delimitador.
+    Endpoint optimizado para reconocimiento en tiempo real.
+    
+    Args:
+        frame_b64: Frame de video codificado en base64 (JPEG)
+        
+    Returns:
+        Coordenadas del rostro detectado y estado de validación
+    """
+    try:
+        face_system = get_face_recognition_system()
+        
+        # Decodificar frame
+        if ',' in frame_b64:
+            frame_b64 = frame_b64.split(',')[1]
+            
+        img_bytes = base64.b64decode(frame_b64)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            raise HTTPException(status_code=400, detail="No se pudo decodificar el frame")
+        
+        # Detectar rostro con coordenadas
+        detectado, info = face_system.detectar_rostro_con_coordenadas(frame)
+        
+        return {
+            "success": True,
+            "detectado": detectado,
+            "rostros_encontrados": info['rostros_encontrados'],
+            "confianza": info['confianza'],
+            "coordenadas": info['coordenadas'],
+            "mensaje": info['mensaje']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error detectando rostro en tiempo real: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

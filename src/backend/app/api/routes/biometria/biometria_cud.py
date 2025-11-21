@@ -18,83 +18,115 @@ app = APIRouter(prefix="/biometria", tags=["biometria"])
 async def create_biometria(
     id_usuario: int = Form(...),
     vector_facial: str = Form(None),
-    imagen_facial: str = Form(None),  # Nueva: imagen en base64 para extraer embedding real
+    imagen_facial: str = Form(None),  # Imagen en base64 para extraer embedding real
     rfid_tag: str = Form(None),
     fecha_actualizacion: str = Form(None),
     template_huella: str = Form(None),
 ):
     """
     Crea un registro biométrico.
-    - Si se proporciona imagen_facial (base64), extrae el embedding real con DeepFace
-    - Si se proporciona vector_facial directamente, lo usa (para compatibilidad)
-    - Si se proporciona template_huella, genera huella_hash
-    - Si se proporciona rfid_tag, lo almacena
+    
+    Parámetros:
+        - id_usuario: ID del usuario en la tabla Usuarios
+        - imagen_facial: Imagen en base64 (RECOMENDADO - extrae embedding con DeepFace)
+        - vector_facial: Embedding pre-calculado en base64 (solo para compatibilidad)
+        - template_huella: Template de huella dactilar en base64
+        - rfid_tag: Código RFID del usuario
+        - fecha_actualizacion: Fecha de actualización (opcional)
+    
+    Retorna:
+        - success: True/False
+        - data: Registro biométrico creado
+        - message: Mensaje descriptivo
     """
     try:
         huella_hash = None
         facial_hash = None
         embedding_final = None
 
-        # 🔹 Si se proporciona una imagen, extraer embedding real con DeepFace
+        # ========================================
+        # 🔹 PROCESAMIENTO DE DATOS FACIALES
+        # ========================================
+        
+        # Opción 1: Si se proporciona una imagen, extraer embedding real con DeepFace (RECOMENDADO)
         if imagen_facial and not vector_facial:
-            logger.info("Extrayendo embedding facial desde imagen con DeepFace...")
+            logger.info("=" * 80)
+            logger.info("📸 REGISTRO FACIAL: Extrayendo embedding desde imagen con DeepFace")
+            logger.info("=" * 80)
+            
             face_system = get_face_recognition_system()
+            
+            # Validar calidad de la imagen primero
+            es_valida, mensaje = face_system.validar_imagen_base64(imagen_facial)
+            if not es_valida:
+                logger.warning(f"❌ Imagen rechazada: {mensaje}")
+                raise HTTPException(status_code=400, detail=mensaje)
+            
+            logger.info(f"✅ Imagen validada: {mensaje}")
+            
+            # Extraer embedding
             embedding_array = face_system.extraer_embedding_desde_base64(imagen_facial)
             
             if embedding_array is None:
                 raise HTTPException(
-                    status_code=400, 
-                    detail="No se pudo detectar un rostro en la imagen. Asegúrate de que la foto muestre claramente tu cara."
+                    status_code=400,
+                    detail="No se pudo extraer el embedding facial. Verifica que la imagen muestre claramente un rostro."
                 )
             
-            logger.info(f"✅ Embedding extraído exitosamente. Shape original: {embedding_array.shape}, dtype: {embedding_array.dtype}")
-            logger.info(f"   Primeros 5 valores: {embedding_array[:5]}")
-            
-            # 🔧 CRÍTICO: Convertir a float32 para consistencia (DeepFace retorna float64)
-            embedding_array = embedding_array.astype(np.float32)
-            logger.info(f"   Convertido a dtype: {embedding_array.dtype}")
-            
             # Convertir embedding a base64 para almacenar
-            embedding_bytes = embedding_array.tobytes()
-            logger.info(f"   Bytes generados: {len(embedding_bytes)} bytes ({embedding_array.shape[0]} floats * 4 bytes)")
+            embedding_final = face_system.embedding_a_base64(embedding_array)
             
-            embedding_final = base64.b64encode(embedding_bytes).decode('utf-8')
-            logger.info(f"   Base64 generado: {len(embedding_final)} caracteres")
+            logger.info(f"✅ Embedding procesado y serializado correctamente")
+            logger.info(f"   • Dimensión: {embedding_array.shape[0]}")
+            logger.info(f"   • Tipo: {embedding_array.dtype}")
+            logger.info(f"   • Base64 length: {len(embedding_final)} caracteres")
             
-            # VERIFICAR: decodificar para confirmar que no se duplicó
-            test_decode = np.frombuffer(base64.b64decode(embedding_final), dtype=np.float32)
-            logger.info(f"   ✅ VERIFICACIÓN: Shape después de decodificar = {test_decode.shape} (debe ser 512)")
+            # Verificar que no se haya duplicado (debe ser ~2730 caracteres para 512 floats)
+            expected_length = (512 * 4 * 4) // 3  # 512 floats * 4 bytes * 4/3 (base64)
+            if abs(len(embedding_final) - expected_length) > 100:
+                logger.warning(f"⚠️  Longitud inesperada de base64: {len(embedding_final)} (esperado ~{expected_length})")
         
-        # 🔹 Si se proporciona vector_facial directamente (modo sintético/compatibilidad)
+        # Opción 2: Si se proporciona vector_facial directamente (modo compatibilidad)
         elif vector_facial:
             embedding_final = vector_facial
-            logger.info("Usando vector_facial proporcionado directamente")
+            logger.info("📦 Usando vector_facial proporcionado directamente")
+            logger.info(f"   • Base64 length: {len(embedding_final)} caracteres")
         
-        # 🔹 Calcular hash de huella si se proporciona
+        # ========================================
+        # 🔹 PROCESAMIENTO DE HUELLA DACTILAR
+        # ========================================
+        
         if template_huella:
             padded_template = template_huella + '=' * (-len(template_huella) % 4)
             huella_hash = hashlib.sha256(base64.b64decode(padded_template)).hexdigest()[:8]
-            logger.info(f"Hash de huella calculado: {huella_hash}")
+            logger.info(f"🔐 Hash de huella calculado: {huella_hash}")
 
-        # 🔹 Calcular hash de vector facial si existe
+        # ========================================
+        # 🔹 CÁLCULO DE HASH FACIAL
+        # ========================================
+        
         if embedding_final:
             try:
-                # Intentar decodificar como Base64 (numpy serializado)
-                try:
-                    padded_vector = embedding_final + '=' * (-len(embedding_final) % 4)
-                    vector_bytes = base64.b64decode(padded_vector)
-                    embedding = np.frombuffer(vector_bytes, dtype=np.float32)
-                except Exception:
-                    # Si falla, asumir formato JSON
-                    embedding = np.array(json.loads(embedding_final), dtype=np.float32)
+                face_system = get_face_recognition_system()
                 
-                # Normalizar y calcular hash
-                embedding_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
-                facial_hash = hashlib.sha256(embedding_norm.tobytes()).hexdigest()[:8]
-                logger.info(f"Hash facial calculado: {facial_hash}")
+                # Decodificar embedding desde base64
+                embedding = face_system.base64_a_embedding(embedding_final)
+                
+                if embedding is not None:
+                    # Normalizar y calcular hash
+                    embedding_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
+                    facial_hash = hashlib.sha256(embedding_norm.tobytes()).hexdigest()[:8]
+                    logger.info(f"🔐 Hash facial calculado: {facial_hash}")
+                else:
+                    logger.warning("⚠️  No se pudo decodificar embedding para calcular hash")
+                    
             except Exception as e:
-                logger.warning(f"Error calculando facial_hash: {e}")
+                logger.warning(f"⚠️  Error calculando facial_hash: {e}")
 
+        # ========================================
+        # 🔹 CREACIÓN DEL REGISTRO
+        # ========================================
+        
         item = BiometriaCreate(
             id_usuario=id_usuario,
             vector_facial=embedding_final,
@@ -106,20 +138,27 @@ async def create_biometria(
         )
 
         controller.add(item)
-        logger.info(f"[POST /create] Biometria creada exitosamente para usuario {id_usuario}")
+        
+        logger.info("=" * 80)
+        logger.info(f"✅ REGISTRO BIOMÉTRICO CREADO EXITOSAMENTE")
+        logger.info(f"   • Usuario ID: {id_usuario}")
+        logger.info(f"   • Tiene vector facial: {embedding_final is not None}")
+        logger.info(f"   • Tiene huella: {template_huella is not None}")
+        logger.info(f"   • Tiene RFID: {rfid_tag is not None}")
+        logger.info("=" * 80)
 
         return {
             "operation": "create",
             "success": True,
             "data": BiometriaOut(**item.model_dump()).model_dump(),
-            "message": "Biometria creada correctamente con reconocimiento facial real.",
+            "message": "✅ Registro biométrico creado correctamente con reconocimiento facial DeepFace.",
         }
 
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.error(f"[POST /create] Error interno: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Error interno en /biometria/create: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 
 @app.post("/update")

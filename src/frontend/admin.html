@@ -1204,6 +1204,13 @@
                 if (section === 'torniquetes') cargarTorniquetes();
             });
         });
+        
+        // 🔥 CARGAR DATOS INICIALES AL ABRIR LA PÁGINA
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Página cargada, iniciando carga de datos...');
+            cargarEstadisticas();
+            cargarUsuarios(); // ✅ CARGAR USUARIOS AL INICIO
+        });
 
         // Cargar Estadísticas
         async function cargarEstadisticas() {
@@ -1448,22 +1455,56 @@
                 const dataUsuarios = await resUsuarios.json();
                 const dataBiometrias = await resBiometrias.json();
                 
-                console.log('📦 Data usuarios:', dataUsuarios);
-                console.log('📦 Data biometrías:', dataBiometrias);
+                console.log('📦 Data usuarios RAW:', dataUsuarios);
+                console.log('📦 Data biometrías RAW:', dataBiometrias);
                 
-                // Guardar todos los usuarios y biometrías en variables globales
-                todosLosUsuarios = dataUsuarios.success && dataUsuarios.data ? dataUsuarios.data : [];
-                todasLasBiometrias = dataBiometrias.success && dataBiometrias.data ? dataBiometrias.data : [];
+                // Manejar diferentes formatos de respuesta del backend
+                if (Array.isArray(dataUsuarios)) {
+                    todosLosUsuarios = dataUsuarios;
+                } else if (dataUsuarios.success && dataUsuarios.data) {
+                    todosLosUsuarios = dataUsuarios.data;
+                } else if (dataUsuarios.data) {
+                    todosLosUsuarios = Array.isArray(dataUsuarios.data) ? dataUsuarios.data : [];
+                } else {
+                    todosLosUsuarios = [];
+                }
                 
-                console.log(`📊 Cargados ${todosLosUsuarios.length} usuarios y ${todasLasBiometrias.length} registros biométricos`);
-                console.log('👥 Usuarios:', todosLosUsuarios);
+                if (Array.isArray(dataBiometrias)) {
+                    todasLasBiometrias = dataBiometrias;
+                } else if (dataBiometrias.success && dataBiometrias.data) {
+                    todasLasBiometrias = dataBiometrias.data;
+                } else if (dataBiometrias.data) {
+                    todasLasBiometrias = Array.isArray(dataBiometrias.data) ? dataBiometrias.data : [];
+                } else {
+                    todasLasBiometrias = [];
+                }
+                
+                console.log(`📊 ✅ Procesados ${todosLosUsuarios.length} usuarios y ${todasLasBiometrias.length} registros biométricos`);
+                console.log('👥 Usuarios procesados:', todosLosUsuarios);
                 
                 // Renderizar usuarios
                 renderizarUsuarios(todosLosUsuarios);
             } catch (err) {
                 console.error('❌ Error completo:', err);
                 console.error('❌ Stack:', err.stack);
-                document.getElementById('tablaUsuarios').innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: var(--red-400);">Error al cargar usuarios. Revisa la consola para más detalles.</td></tr>';
+                document.getElementById('tablaUsuarios').innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 2rem;">
+                            <div style="color: var(--red); margin-bottom: 1rem;">
+                                <i class="fas fa-exclamation-triangle fa-3x"></i>
+                            </div>
+                            <div style="font-size: 1.1em; font-weight: 600; margin-bottom: 0.5rem;">
+                                Error al cargar usuarios
+                            </div>
+                            <div style="color: var(--text-secondary); font-size: 0.9em;">
+                                ${err.message}
+                            </div>
+                            <button class="btn btn-primary" onclick="cargarUsuarios()" style="margin-top: 1rem;">
+                                <i class="fas fa-redo me-2"></i>Reintentar
+                            </button>
+                        </td>
+                    </tr>
+                `;
                 todosLosUsuarios = [];
                 todasLasBiometrias = [];
             } finally {
@@ -1475,44 +1516,111 @@
         function renderizarUsuarios(usuarios) {
             const tbody = document.getElementById('tablaUsuarios');
             
-            console.log('🎨 Renderizando usuarios:', usuarios ? usuarios.length : 0);
+            console.log('🎨 Renderizando usuarios. Total:', usuarios ? usuarios.length : 0);
+            console.log('   Usuarios a renderizar:', usuarios);
             
-            if (usuarios && usuarios.length > 0) {
-                tbody.innerHTML = usuarios.map(u => {
-                    // Buscar biometrías del usuario
-                    const bioUsuario = todasLasBiometrias.filter(b => b.id_usuario === u.id_usuario);
-                    const rfidData = bioUsuario.find(b => b.tipo_biometria === 'RFID');
-                    const facialData = bioUsuario.find(b => b.tipo_biometria === 'FACIAL');
-                    const huellaData = bioUsuario.find(b => b.tipo_biometria === 'HUELLA');
-                    
-                    return `
-                        <tr id="usuario-row-${u.id_usuario}">
-                            <td><strong>${u.id_usuario || '-'}</strong></td>
-                            <td>${u.nombre_completo || u.nombre || '-'}</td>
-                            <td>${u.cargo || '-'}</td>
-                            <td>${rfidData ? `<span class="badge badge-info" style="background: #0ea5e9;">${rfidData.dato_biometrico || 'Registrado'}</span>` : '<span class="badge badge-secondary" style="background: #64748b;">No registrado</span>'}</td>
-                            <td>${facialData ? '<span class="badge badge-success" style="background: #10b981;">Activado</span>' : '<span class="badge badge-secondary" style="background: #64748b;">Desactivado</span>'}</td>
-                            <td>${huellaData ? '<span class="badge badge-success" style="background: #10b981;">Activado</span>' : '<span class="badge badge-secondary" style="background: #64748b;">Desactivado</span>'}</td>
-                            <td>
-                                <span class="badge ${u.estado === 'activo' || u.estado === true ? 'badge-success' : 'badge-danger'}" style="background: ${u.estado === true || u.estado === 'activo' ? '#10b981' : '#ef4444'};">
-                                    ${u.estado === true || u.estado === 'activo' ? 'Activo' : 'Inactivo'}
-                                </span>
-                            </td>
-                            <td>${u.fecha_registro || '-'}</td>
-                            <td>
-                                <button class="btn btn-primary btn-sm" onclick="editarUsuario(${u.id_usuario})" title="Editar usuario">
+            if (!usuarios || usuarios.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 3rem;">
+                            <div style="color: var(--text-secondary); margin-bottom: 1rem;">
+                                <i class="fas fa-users fa-3x"></i>
+                            </div>
+                            <div style="font-size: 1.1em; color: var(--text-primary);">
+                                No hay usuarios registrados
+                            </div>
+                            <div style="font-size: 0.9em; color: var(--text-secondary); margin-top: 0.5rem;">
+                                Crea un nuevo usuario para comenzar
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = usuarios.map((u, index) => {
+                console.log(`   Renderizando usuario ${index + 1}:`, u);
+                
+                // Buscar biometrías del usuario
+                const bioUsuario = todasLasBiometrias.filter(b => b.id_usuario === u.id_usuario);
+                
+                // Buscar datos biométricos específicos
+                const tieneRFID = bioUsuario.some(b => b.rfid_tag);
+                const tieneFacial = bioUsuario.some(b => b.vector_facial);
+                const tieneHuella = bioUsuario.some(b => b.template_huella);
+                
+                const rfidTag = bioUsuario.find(b => b.rfid_tag)?.rfid_tag || null;
+                
+                return `
+                    <tr id="usuario-row-${u.id_usuario}" style="transition: all 0.3s ease;">
+                        <td><strong>${u.id_usuario || '-'}</strong></td>
+                        <td>
+                            <div style="font-weight: 500;">${u.nombre_completo || u.nombre || '-'}</div>
+                            ${u.codigo_estudiante ? `<div style="font-size: 0.8em; color: var(--text-secondary);">Código: ${u.codigo_estudiante}</div>` : ''}
+                        </td>
+                        <td>
+                            <span class="badge" style="background: var(--blue); color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85em;">
+                                ${u.cargo || 'Sin cargo'}
+                            </span>
+                        </td>
+                        <td>
+                            ${tieneRFID ? 
+                                `<span class="badge badge-success" style="background: var(--green); color: white; padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                    <i class="fas fa-check-circle me-1"></i>${rfidTag || 'Registrado'}
+                                </span>` : 
+                                `<span class="badge badge-secondary" style="background: var(--bg-tertiary); color: var(--text-secondary); padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                    <i class="fas fa-times-circle me-1"></i>No registrado
+                                </span>`
+                            }
+                        </td>
+                        <td>
+                            ${tieneFacial ? 
+                                `<span class="badge badge-success" style="background: var(--green); color: white; padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                    <i class="fas fa-check-circle me-1"></i>Registrado
+                                </span>` : 
+                                `<span class="badge badge-secondary" style="background: var(--bg-tertiary); color: var(--text-secondary); padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                    <i class="fas fa-times-circle me-1"></i>No registrado
+                                </span>`
+                            }
+                        </td>
+                        <td>
+                            ${tieneHuella ? 
+                                `<span class="badge badge-success" style="background: var(--green); color: white; padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                    <i class="fas fa-check-circle me-1"></i>Registrado
+                                </span>` : 
+                                `<span class="badge badge-secondary" style="background: var(--bg-tertiary); color: var(--text-secondary); padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                    <i class="fas fa-times-circle me-1"></i>No registrado
+                                </span>`
+                            }
+                        </td>
+                        <td>
+                            ${(u.estado === true || u.estado === 'activo' || u.estado === 1) ? 
+                                `<span class="badge badge-success" style="background: var(--green); color: white; padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                    <i class="fas fa-check-circle me-1"></i>Activo
+                                </span>` : 
+                                `<span class="badge badge-danger" style="background: var(--red); color: white; padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                    <i class="fas fa-ban me-1"></i>Inactivo
+                                </span>`
+                            }
+                        </td>
+                        <td style="font-size: 0.9em; color: var(--text-secondary);">
+                            ${u.fecha_registro || '-'}
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                                <button class="btn btn-primary btn-sm" onclick="editarUsuario(${u.id_usuario})" title="Editar usuario" style="padding: 0.4rem 0.75rem;">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-danger btn-sm" onclick="eliminarUsuarioRapido(${u.id_usuario}, '${(u.nombre_completo || u.nombre || 'Usuario').replace(/'/g, "\\'")}');" title="Eliminar usuario">
-                                    <i class="fas fa-times"></i>
+                                <button class="btn btn-danger btn-sm" onclick="confirmarEliminarUsuario(${u.id_usuario}, '${(u.nombre_completo || u.nombre || 'Usuario').replace(/'/g, "\\'")}');" title="Eliminar usuario" style="padding: 0.4rem 0.75rem; background: var(--red);">
+                                    <i class="fas fa-trash"></i>
                                 </button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-            } else {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: var(--slate-500);">No hay usuarios que coincidan con los filtros</td></tr>';
-            }
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            console.log('✅ Usuarios renderizados correctamente');
         }
         
         // Función para filtrar usuarios
@@ -1693,28 +1801,44 @@
             }
         }
         
-        // NUEVA FUNCIÓN: Eliminación rápida sin confirmación con auto-refresh
+        // Función de confirmación antes de eliminar
+        function confirmarEliminarUsuario(id, nombre) {
+            if (confirm(`⚠️ ¿Estás seguro de eliminar al usuario "${nombre}"?\n\nEsta acción NO se puede deshacer.`)) {
+                eliminarUsuarioRapido(id, nombre);
+            }
+        }
+        
+        // FUNCIÓN: Eliminación rápida con animación y auto-refresh
         async function eliminarUsuarioRapido(id, nombre) {
             const row = document.getElementById(`usuario-row-${id}`);
+            
+            console.log(`🗑️ Eliminando usuario ${id}: ${nombre}`);
             
             // Animación de eliminación
             if (row) {
                 row.style.opacity = '0.5';
-                row.style.transition = 'opacity 0.3s';
+                row.style.transition = 'all 0.3s';
             }
             
             try {
                 const formData = new FormData();
                 formData.append("id_usuario", id);
                 
+                console.log('📤 Enviando petición de eliminación...');
+                
                 const res = await fetch(`${API_URL}/usuarios/delete`, {
                     method: "POST",
                     headers: getAuthHeadersFormData(),
                     body: formData
                 });
+                
                 const data = await res.json();
                 
+                console.log('📥 Respuesta:', data);
+                
                 if (data.success) {
+                    console.log('✅ Usuario eliminado correctamente');
+                    
                     // Eliminar de la lista local
                     todosLosUsuarios = todosLosUsuarios.filter(u => u.id_usuario !== id);
                     
@@ -1724,17 +1848,20 @@
                         row.style.transform = 'translateX(-20px)';
                         setTimeout(() => {
                             row.remove();
-                            // Re-renderizar para actualizar índices
-                            filtrarUsuarios(); // Aplica filtros actuales
+                            // Re-renderizar si no quedan usuarios
+                            if (document.querySelectorAll('#tablaUsuarios tr').length === 0) {
+                                renderizarUsuarios(todosLosUsuarios);
+                            }
                         }, 300);
                     }
                     
-                    // Actualizar estadísticas sin recargar todo
+                    // Actualizar estadísticas
                     cargarEstadisticas();
                     
-                    // Mostrar notificación sutil
+                    // Mostrar notificación
                     mostrarNotificacion(`✅ ${nombre} eliminado correctamente`, 'success');
                 } else {
+                    console.error('❌ Error al eliminar:', data.message);
                     // Restaurar fila si falla
                     if (row) {
                         row.style.opacity = '1';
@@ -1742,6 +1869,7 @@
                     mostrarNotificacion(`❌ Error: ${data.message || 'No se pudo eliminar'}`, 'error');
                 }
             } catch (err) {
+                console.error('❌ Error de conexión:', err);
                 // Restaurar fila si hay error
                 if (row) {
                     row.style.opacity = '1';

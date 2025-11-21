@@ -21,6 +21,23 @@ class AccessService:
         if isinstance(verificador, VerificadorCamara):
             detalles = verificador.detalles_comparacion
         
+        # 🔹 OBTENER DATOS COMPLETOS DEL USUARIO
+        usuario_data = {}
+        if usuario_id:
+            try:
+                from app.models.usuarios import UsuariosOut
+                usuario = controller.get_by_field_obj(UsuariosOut(), "id_usuario", usuario_id)
+                if usuario:
+                    usuario_data = {
+                        "nombre": usuario.get("nombre_completo"),
+                        "nombre_completo": usuario.get("nombre_completo"),
+                        "cargo": usuario.get("cargo"),
+                        "foto": usuario.get("imagen_facial")
+                    }
+                    logger.info(f"✅ Datos de usuario obtenidos: {usuario_data.get('nombre')}")
+            except Exception as e:
+                logger.warning(f"⚠️ No se pudieron obtener datos del usuario: {e}")
+        
         # ✅ GUARDAR REGISTRO EN LA BASE DE DATOS
         try:
             # Mapear nombres de medios
@@ -56,5 +73,6 @@ class AccessService:
             usuario_id=usuario_id,
             mensaje="Acceso concedido" if autorizado else "Acceso denegado",
             score=detalles.get("mejor_score") if detalles else None,
-            detalles_verificacion=detalles
+            detalles_verificacion=detalles,
+            **usuario_data  # Agregar datos del usuario (nombre, cargo, foto)
         )

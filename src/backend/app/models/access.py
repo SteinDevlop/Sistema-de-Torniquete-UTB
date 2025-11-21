@@ -22,3 +22,12 @@ class AccesoResponse(BaseModel):
     mensaje: Optional[str] = None
     score: Optional[float] = None  # Score de similitud (para reconocimiento facial)
     detalles_verificacion: Optional[Dict[str, Any]] = None  # Detalles adicionales de la verificación
+    
+    # Datos adicionales del usuario (opcionales)
+    nombre: Optional[str] = None
+    nombre_completo: Optional[str] = None
+    cargo: Optional[str] = None
+    foto: Optional[str] = None  # Imagen en base64
+    
+    class Config:
+        extra = "allow"  # Permitir campos adicionales

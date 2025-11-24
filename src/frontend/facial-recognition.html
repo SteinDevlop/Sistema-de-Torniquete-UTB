@@ -37,15 +37,15 @@
           </div>
           <div class="mb-3">
             <button id="btnStartCamera" class="btn btn-primary btn-custom w-100">📷 Abrir Cámara</button>
-            <button id="btnCapture" class="btn btn-success btn-custom w-100 mt-2" style="display:none;">📸 Capturar Foto</button>
-            <button id="btnRegister" class="btn btn-warning btn-custom w-100 mt-2" style="display:none;">✅ Registrar Usuario</button>
+            <button id="btnCapture" class="btn btn-success btn-custom w-100 mt-2 d-none">📸 Capturar Foto</button>
+            <button id="btnRegister" class="btn btn-warning btn-custom w-100 mt-2 d-none">✅ Registrar Usuario</button>
           </div>
           <div id="regResult"></div>
         </div>
         <div class="col-md-6">
           <div class="camera-container">
             <video id="video" autoplay playsinline></video>
-            <canvas id="canvas" style="display:none;"></canvas>
+            <canvas id="canvas" class="d-none"></canvas>
             <img id="capturedImage" alt="Foto capturada">
           </div>
         </div>
@@ -72,13 +72,13 @@
           <div id="cameraVerifyPanel">
             <div class="mb-3">
               <button id="btnStartCameraVerify" class="btn btn-primary btn-custom w-100">📷 Abrir Cámara</button>
-              <button id="btnCaptureVerify" class="btn btn-success btn-custom w-100 mt-2" style="display:none;">📸 Capturar Foto</button>
-              <button id="btnVerify" class="btn btn-danger btn-custom w-100 mt-2" style="display:none;">🔓 Verificar Acceso</button>
+              <button id="btnCaptureVerify" class="btn btn-success btn-custom w-100 mt-2 d-none">📸 Capturar Foto</button>
+              <button id="btnVerify" class="btn btn-danger btn-custom w-100 mt-2 d-none">🔓 Verificar Acceso</button>
             </div>
           </div>
           
           <!-- Opción 2: Archivo -->
-          <div id="fileVerifyPanel" style="display:none;">
+          <div id="fileVerifyPanel" class="d-none">
             <div class="mb-3">
               <label class="form-label fw-bold">Seleccionar Imagen</label>
               <input type="file" id="fileInput" class="form-control" accept="image/*">
@@ -91,9 +91,9 @@
         <div class="col-md-6">
           <div class="camera-container">
             <video id="videoVerify" autoplay playsinline></video>
-            <canvas id="canvasVerify" style="display:none;"></canvas>
-            <img id="capturedImageVerify" style="display:none; width: 100%; border-radius: 10px; border: 3px solid #28a745;">
-            <img id="uploadedImageVerify" style="display:none; width: 100%; border-radius: 10px; border: 3px solid #17a2b8;">
+            <canvas id="canvasVerify" class="d-none"></canvas>
+            <img id="capturedImageVerify" class="d-none" style="width: 100%; border-radius: 10px; border: 3px solid #28a745;">
+            <img id="uploadedImageVerify" class="d-none" style="width: 100%; border-radius: 10px; border: 3px solid #17a2b8;">
           </div>
         </div>
       </div>

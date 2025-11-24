@@ -1,4 +1,4 @@
-import API_URL from './api_root.js';
+const API_URL = "http://localhost:8000";
         let currentUserId = null;
         let cameraStream = null;
         
@@ -10,6 +10,7 @@ import API_URL from './api_root.js';
         let faceDetected = false;
         let previousEyeState = 'open';
         let verificationType = 'acceso'; // 'acceso' o 'registro'
+        let validacionPollInterval = null;
         
         // Variables para suavizar movimiento del cuadro
         let currentFaceX = null;
@@ -30,19 +31,20 @@ import API_URL from './api_root.js';
         function cerrarModal() {
             const modal = document.getElementById('cameraModal');
             if (modal) {
-                modal.classList.remove('show');
-                document.body.style.overflow = ''; // Restore scroll
-            }
-            
-            // Detener verificación y liberar cámara
-            detenerVerificacion();
-            
+                        modal.classList.remove('show');
+                        document.body.style.overflow = 'auto';
+                    }
+
+            // Detener verificación de parpadeos si estaba activa
+            try { detenerVerificacion(); } catch(e) { /* ignore if not defined */ }
+
+            // Detener cámara si estaba activa
             if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
+                try { cameraStream.getTracks().forEach(t => t.stop()); } catch (e) { /* ignore */ }
                 cameraStream = null;
             }
         }
-        
+
         function closeModalOnBackdrop(event) {
             // Cerrar solo si se hace click en el fondo (no en el contenido)
             if (event.target === event.currentTarget) {
@@ -51,6 +53,8 @@ import API_URL from './api_root.js';
         }
         
         // Cerrar modal con tecla Escape
+                    // Refrescar lista de usuarios si está visible
+                    try { buscarUsuarios(); } catch(e) {}
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 cerrarModal();
@@ -64,12 +68,40 @@ import API_URL from './api_root.js';
             if (token) headers["Authorization"] = `Bearer ${token}`;
             return headers;
         }
+        
+        // Helper seguro para llamadas fetch: maneja status HTTP y parsing JSON robusto
+        async function safeFetch(url, options = {}) {
+            try {
+                const res = await fetch(url, options);
+                const text = await res.text().catch(() => '');
+                let data = null;
+                try { data = text ? JSON.parse(text) : {}; } catch (e) { data = { raw: text }; }
+
+                if (!res.ok) {
+                    const err = new Error(`HTTP ${res.status} ${res.statusText}` + (text ? `: ${text}` : ''));
+                    err.status = res.status;
+                    err.body = data;
+                    throw err;
+                }
+
+                return data;
+            } catch (err) {
+                throw err;
+            }
+        }
         function showLoading() { document.getElementById("loadingOverlay").classList.add("show"); }
         function hideLoading() { document.getElementById("loadingOverlay").classList.remove("show"); }
         
+        
         // ===== MODALES INFORMATIVOS DE ACCESO =====
         function mostrarModalAcceso(data) {
-            const isSuccess = data.status || data.success;
+            // Normalizar distintos formatos de respuesta: success, status, resultado, operation
+            const isSuccess = !!(
+                data?.status === true ||
+                data?.success === true ||
+                data?.resultado === true ||
+                (data?.operation === 'create' && data?.success !== false)
+            );
             const tiempoValidez = data.tiempo_validez || 30; // segundos
             
             const modalHtml = `
@@ -96,11 +128,11 @@ import API_URL from './api_root.js';
                         <div class="access-modal-info">
                             <div class="access-modal-row">
                                 <span class="access-modal-label"><i class="fas fa-user me-2"></i>Usuario</span>
-                                <span class="access-modal-value">${data.nombre || data.usuario_id || 'Desconocido'}</span>
+                                <span class="access-modal-value">${data.nombre || data.nombre_completo || data.usuario || data.usuario_id || 'Desconocido'}</span>
                             </div>
                             <div class="access-modal-row">
                                 <span class="access-modal-label"><i class="fas fa-id-card me-2"></i>ID</span>
-                                <span class="access-modal-value">#${data.usuario_id || 'N/A'}</span>
+                                <span class="access-modal-value">#${data.usuario_id || data.id_usuario || data.id || 'N/A'}</span>
                             </div>
                             ${data.cargo ? `
                                 <div class="access-modal-row">
@@ -128,9 +160,12 @@ import API_URL from './api_root.js';
                             </div>
                         ` : ''}
                         
-                        <button class="btn btn-${isSuccess ? 'success' : 'danger'} w-100 mt-3" onclick="cerrarModalAcceso()">
-                            <i class="fas fa-check me-2"></i>Entendido
-                        </button>
+                        <div style="display:flex; gap:.5rem; margin-top:1rem;">
+                            <button class="btn btn-${isSuccess ? 'success' : 'danger'} w-100" onclick="cerrarModalAcceso()">
+                                <i class="fas fa-check me-2"></i>Entendido
+                            </button>
+                            ${ (data.usuario_id || data.id_usuario || data.id) ? `<button class="btn btn-secondary" onclick="(window.editarUsuarioOperador || (()=>{}))(${data.usuario_id || data.id_usuario || data.id}); cerrarModalAcceso();">Editar Perfil</button>` : ''}
+                        </div>
                     </div>
                 </div>
             `;
@@ -223,369 +258,7 @@ import API_URL from './api_root.js';
             const modal = document.getElementById('registroModal');
             if (modal) modal.remove();
         }
-        
-        function showTab(tabName) {
-            document.querySelectorAll(".tab-content").forEach(t => t.style.display = "none");
-            document.querySelectorAll(".nav-link").forEach(l => l.classList.remove("active"));
-            document.getElementById(tabName + "-tab").style.display = "block";
-            document.querySelector(`[data-section="${tabName}"]`).classList.add("active");
-            
-            // Limpiar panel de información de usuario al cambiar de pestaña (privacidad)
-            const userInfoPanel = document.getElementById("userInfoPanel");
-            if (userInfoPanel) {
-                userInfoPanel.classList.remove('show');
-                userInfoPanel.innerHTML = '';
-            }
-            
-            if (tabName === "validacion") cargarUltimosAccesos();
-            if (tabName === "busqueda") buscarUsuarios(); // Cargar todos los usuarios al abrir
-        }
-        async function verificarRFID() {
-            // Crear modal para ingresar RFID
-            const modalHtml = `
-                <div class="modal-backdrop" onclick="cerrarModalRFID()"></div>
-                <div class="modal-dialog" style="max-width: 400px;">
-                    <div style="background: var(--bg-secondary); border-radius: 16px; padding: 2rem; border: 1px solid var(--border);">
-                        <div style="text-align: center; margin-bottom: 1.5rem;">
-                            <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #3b82f6, #2563eb); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-                                <i class="fas fa-id-card" style="font-size: 2rem; color: white;"></i>
-                            </div>
-                            <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">Verificación RFID</h3>
-                            <p style="color: var(--text-secondary); font-size: 0.875rem;">Ingrese el código de la tarjeta RFID</p>
-                        </div>
-                        
-                        <input 
-                            type="text" 
-                            id="rfidInput" 
-                            placeholder="Ej: ABC123456789"
-                            style="width: 100%; padding: 0.75rem 1rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 1rem; margin-bottom: 1.5rem;"
-                            autofocus
-                        />
-                        
-                        <div style="display: flex; gap: 0.75rem;">
-                            <button onclick="cerrarModalRFID()" class="btn btn-secondary" style="flex: 1;">
-                                <i class="fas fa-times me-2"></i>Cancelar
-                            </button>
-                            <button onclick="procesarRFID()" class="btn btn-primary" style="flex: 1;">
-                                <i class="fas fa-check me-2"></i>Verificar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            const modalContainer = document.createElement('div');
-            modalContainer.id = 'modalRFID';
-            modalContainer.innerHTML = modalHtml;
-            document.body.appendChild(modalContainer);
-            
-            // Focus en el input
-            setTimeout(() => document.getElementById('rfidInput')?.focus(), 100);
-            
-            // Enter para verificar
-            document.getElementById('rfidInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') procesarRFID();
-            });
-        }
-        
-        function cerrarModalRFID() {
-            const modal = document.getElementById('modalRFID');
-            if (modal) modal.remove();
-        }
-        
-        async function procesarRFID() {
-            const tag = document.getElementById('rfidInput')?.value.trim();
-            if (!tag) {
-                document.getElementById('rfidInput').style.borderColor = 'var(--red)';
-                return;
-            }
-            
-            cerrarModalRFID();
-            showLoading();
-            
-            try {
-                const res = await fetch(`${API_URL}/acceso/rfid?rfid_tag=${encodeURIComponent(tag)}`, {
-                    method: "POST", headers: getAuthHeaders()
-                });
-                const data = await res.json();
-                hideLoading();
-                
-                // Agregar información del método
-                data.metodo = "RFID";
-                
-                // Mostrar modal informativo
-                mostrarModalAcceso(data);
-                cargarUltimosAccesos();
-            } catch (err) {
-                hideLoading();
-                mostrarModalRegistro({ success: false, mensaje: "Error de conexión: " + err.message }, "Error");
-            }
-        }
-        async function verificarHuella() {
-            mostrarModalRegistro({ 
-                success: false, 
-                mensaje: "Funcionalidad de huella requiere hardware especializado" 
-            }, "Huella Dactilar");
-        }
 
-        // Nuevo flujo: abrir selector y permitir elegir cámara antes de iniciar
-        async function verificarFacial() {
-            verificationType = "acceso";
-            
-            // Resetear estado
-            blinkCount = 0;
-            isVerifying = false;
-            faceDetected = false;
-            document.getElementById("verificationResult").innerHTML = '';
-            document.getElementById("userInfoPanel").classList.remove('show');
-            updateBlinkUI();
-            
-            // Abrir modal y popular lista de cámaras; el usuario iniciará la cámara manualmente
-            abrirModal("cameraModal");
-            await populateCameraList();
-        }
-
-        // Para registro: igual flujo (usuario elige cámara)
-        async function capturarRostro() {
-            if (!currentUserId) {
-                alert("Primero cree el usuario base");
-                return;
-            }
-            
-            // Para registro, usar captura simple sin liveness (el usuario aún no tiene rostro en BD)
-            verificationType = "registro";
-            document.getElementById("cameraModalTitle").textContent = "Registrar Rostro del Usuario";
-            
-            // Ocultar controles de liveness para registro
-            const livenessEl = document.getElementById("livenessIndicator");
-            if (livenessEl) livenessEl.style.display = "none";
-            const progressEl = document.getElementById("progressContainer");
-            if (progressEl) progressEl.style.display = "none";
-            
-            abrirModal("cameraModal");
-            await populateCameraList();
-        }
-
-        // ===== Gestión de dispositivos de vídeo y arranque por dispositivo seleccionado =====
-        async function populateCameraList() {
-            const select = document.getElementById('cameraSelect');
-            const startBtn = document.getElementById('btnStartCamera');
-            const refreshBtn = document.getElementById('btnRefreshCams');
-
-            if (!select || !startBtn || !refreshBtn) return;
-
-            // Limpiar opciones
-            select.innerHTML = '<option value="">Usar cámara por defecto...</option>';
-
-            async function enumerateAndFill() {
-                try {
-                    let devices = await navigator.mediaDevices.enumerateDevices();
-                    let videoInputs = devices;
-
-                    console.info('Listado de dispositivos (raw):', devices); // DEBUG
-
-                    // Si no hay labels (sin permiso), solicitar permiso temporal para obtener nombres
-                    const needsPermission = videoInputs.every(d => !d.label);
-                    if (needsPermission && navigator.mediaDevices.getUserMedia) {
-                        const tmpStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                        tmpStream.getTracks().forEach(t => t.stop());
-                        devices = await navigator.mediaDevices.enumerateDevices();
-                        videoInputs = devices;
-                    }
-
-                    // Añadir opciones mostrando deviceId parcial para identificar cámaras virtuales
-                    videoInputs.forEach((d, idx) => {
-                        const opt = document.createElement('option');
-                        // Mostrar label si existe, sino mostrar identificador parcial para ayudar a identificar OBS
-                        const shortId = d.deviceId ? d.deviceId.substr(0, 8) : `dev${idx+1}`;
-                        opt.value = d.deviceId;
-                        opt.textContent = d.label ? `${d.label} (${shortId})` : `Cámara ${idx + 1} (${shortId})`;
-                        select.appendChild(opt);
-                    });
-
-                    // Si solo hay una cámara y ninguna seleccionada, mantener la opción por defecto
-                } catch (err) {
-                    console.warn("No se pudieron listar dispositivos de cámara:", err);
-                }
-            }
-
-            // acciones
-            refreshBtn.onclick = () => enumerateAndFill();
-            startBtn.onclick = () => {
-                const deviceId = select.value || null;
-                startCameraWithDevice(deviceId);
-            };
-
-            // Soporta Enter en el select para iniciar
-            select.onkeydown = (e) => { if (e.key === 'Enter') startBtn.click(); };
-
-            await enumerateAndFill();
-        }
-
-        async function startCameraWithDevice(deviceId) {
-            try {
-                // Si ya existe stream, detenerlo antes
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(t => t.stop());
-                    cameraStream = null;
-                }
-
-                const constraintsExact = deviceId
-                    ? { video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } } }
-                    : { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } };
-
-                // Intento principal (con exact si se pasó deviceId)
-                try {
-                    cameraStream = await navigator.mediaDevices.getUserMedia(constraintsExact);
-                } catch (err) {
-                    console.warn('Fallo con constraint exact, intentando fallback sin "exact":', err);
-                    // Fallback: intentar usar deviceId sin exact (algunos navegadores/drivers funcionan mejor así)
-                    const constraintsFallback = deviceId
-                        ? { video: { deviceId: deviceId, width: { ideal: 640 }, height: { ideal: 480 } } }
-                        : { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } };
-                    cameraStream = await navigator.mediaDevices.getUserMedia(constraintsFallback);
-                }
-
-                const video = document.getElementById("cameraVideo");
-                video.srcObject = cameraStream;
-                video.onloadedmetadata = () => {
-                    video.play();
-                    console.log("✅ Video iniciado correctamente con dispositivo:", deviceId || 'default');
-                    // iniciar verificación o mostrar botón de captura según tipo
-                    if (verificationType === "acceso") {
-                        setTimeout(() => iniciarVerificacion(), 300);
-                    } else if (verificationType === "registro") {
-                        // mostrar botón de captura manual para registro (si no existe ya)
-                        document.getElementById("verificationResult").innerHTML = `
-                            <button class="btn btn-success w-100 mt-2" onclick="capturarImagenRegistro()">
-                                <i class="fas fa-camera me-2"></i>Capturar y Registrar Rostro
-                            </button>
-                        `;
-                    }
-                };
-            } catch (err) {
-                console.error("Error al iniciar la cámara seleccionada:", err);
-                // Intentar listar dispositivos para debug adicional
-                try { console.info('Enumerando dispositivos al fallar startCameraWithDevice:'); console.table(await navigator.mediaDevices.enumerateDevices()); } catch(e){}
-                alert("No se pudo iniciar la cámara: " + (err.message || err) + ". Revisa que la cámara virtual de OBS esté activa y que el navegador tenga permisos.");
-            }
-        }
-
-        // ===== NUEVA LÓGICA DE DETECCIÓN DE PARPADEO =====
-        async function iniciarVerificacion() {
-            if (isVerifying) return;
-            
-            isVerifying = true;
-            blinkCount = 0;
-            previousEyeState = 'open';
-            
-            document.getElementById("verificationResult").innerHTML = '';
-            
-            // Actualizar UI de parpadeo
-            updateBlinkUI();
-            
-            console.log("🎬 Iniciando detección automática...");
-            
-            // Iniciar detección de parpadeo cada 100ms
-            blinkDetectionInterval = setInterval(detectBlinkAndFace, 100);
-        }
-        
-        function detenerVerificacion() {
-            isVerifying = false;
-            
-            if (blinkDetectionInterval) {
-                clearInterval(blinkDetectionInterval);
-                blinkDetectionInterval = null;
-            }
-            
-            updateFaceBox('no-face');
-            document.getElementById("userInfoPanel")?.classList.remove('show');
-        }
-        
-        // Función principal de detección de parpadeo y rostro
-        async function detectBlinkAndFace() {
-            if (!isVerifying || !cameraStream) return;
-            
-            const video = document.getElementById('cameraVideo');
-            if (!video || !video.videoWidth) return;
-            const canvas = document.getElementById('cameraCanvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-            
-            // ⚠️ SIMULACIÓN MEJORADA de detección facial (PARA DEMOSTRACIÓN)
-            // ⚠️ En producción REAL, integrar face-api.js o TensorFlow.js
-            
-            // ✅ MEJORADO: Simulación más realista con mayor probabilidad de detección
-            const faceDetectedNow = Math.random() > 0.05; // 95% probabilidad
-            
-            if (faceDetectedNow) {
-                faceDetected = true;
-                
-                // Simular posición de la cara con movimiento SUAVE
-                const videoWidth = video.videoWidth;
-                const videoHeight = video.videoHeight;
-                
-                // Si es la primera detección, inicializar en el centro
-                if (currentFaceX === null) {
-                    currentFaceX = videoWidth / 2;
-                    currentFaceY = videoHeight / 2;
-                }
-                
-                // Generar nueva posición objetivo con menos variación
-                targetFaceX = videoWidth / 2 + (Math.random() - 0.5) * 60; // ±30px
-                targetFaceY = videoHeight / 2 + (Math.random() - 0.5) * 40; // ±20px
-                
-                // Interpolar suavemente hacia la posición objetivo
-                currentFaceX += (targetFaceX - currentFaceX) * smoothingFactor;
-                currentFaceY += (targetFaceY - currentFaceY) * smoothingFactor;
-                
-                const faceWidth = 300;
-                const faceHeight = 350;
-                
-                // Actualizar posición del cuadro
-                updateFaceBox('face-detected', {
-                    x: currentFaceX - faceWidth / 2,
-                    y: currentFaceY - faceHeight / 2,
-                    width: faceWidth,
-                    height: faceHeight
-                });
-                
-                // Simulación de detección de parpadeo MEJORADA
-                const isEyeClosed = Math.random() > 0.75; // 25% probabilidad
-                
-                // Detectar transición de abierto → cerrado → abierto
-                if (previousEyeState === 'open' && isEyeClosed) {
-                    previousEyeState = 'closed';
-                    console.log('👁️ Ojo detectado como CERRADO');
-                } else if (previousEyeState === 'closed' && !isEyeClosed) {
-                    // ¡Parpadeo completado!
-                    blinkCount++;
-                    previousEyeState = 'open';
-                    console.log(`✅ Parpadeo ${blinkCount} detectado!`);
-                    updateBlinkUI();
-                    
-                    // Vibración táctil si está disponible
-                    if (navigator.vibrate) {
-                        navigator.vibrate(50);
-                    }
-                    
-                    if (blinkCount >= requiredBlinks) {
-                        // Parpadeos completados, proceder con verificación
-                        console.log('🎉 3 parpadeos completados! Verificando usuario...');
-                        clearInterval(blinkDetectionInterval);
-                        await realizarVerificacionFacial();
-                    }
-                }
-            } else {
-                faceDetected = false;
-                currentFaceX = null; // Reset para próxima detección
-                currentFaceY = null;
-                updateFaceBox('no-face');
-            }
-        }
-        
         // Actualizar UI del contador de parpadeos
         function updateBlinkUI() {
             const blinkCountEl = document.getElementById('blinkCount');
@@ -605,7 +278,7 @@ import API_URL from './api_root.js';
                 status.innerHTML = '<i class="fas fa-check-circle"></i> ¡Parpadeos completados! Verificando...';
             }
         }
-        
+
         // Actualizar cuadro de detección facial (rojo/amarillo/verde)
         function updateFaceBox(state, position = null) {
             const box = document.getElementById('faceBox');
@@ -641,7 +314,7 @@ import API_URL from './api_root.js';
                 label.innerHTML = '<i class="fas fa-check-circle"></i> Usuario reconocido';
             }
         }
-        
+
         // Función para mostrar información simulada del usuario
         function mostrarInfoUsuarioSimulada() {
             const panel = document.getElementById("userInfoPanel");
@@ -658,33 +331,438 @@ import API_URL from './api_root.js';
                 <span>Verificando identidad...</span>
             `;
             if (idEl) idEl.textContent = "ID: Reconociendo...";
-
-            panel.classList.add('show');
         }
-        
-        // Función para actualizar info real del usuario tras reconocimiento
+
+        // Actualizar UI con información real del usuario después de verificar/registrar
         function actualizarInfoUsuario(userData) {
-            const nameEl = document.getElementById("userInfoName");
-            const cargoEl = document.getElementById("userInfoCargo");
-            const idEl = document.getElementById("userInfoId");
-            const photoImg = document.getElementById("userPhotoImg");
+            try {
+                console.log('🔄 Actualizando UI con usuario:', userData);
+                if (!userData) return;
 
-            if (nameEl) nameEl.textContent = userData.nombre || "Usuario desconocido";
-            if (cargoEl) cargoEl.innerHTML = `
-                <i class="fas fa-briefcase"></i>
-                <span>${userData.cargo || 'Sin cargo'}</span>
-            `;
-            if (idEl) idEl.textContent = `ID: #${userData.usuario_id || 'N/A'}`;
+                // Actualizar currentUserId si viene en la respuesta
+                if (userData.usuario_id) {
+                    currentUserId = userData.usuario_id;
+                }
 
-            // Mostrar foto si existe y si el elemento está presente
-            if (userData.foto && photoImg) {
-                photoImg.src = `data:image/jpeg;base64,${userData.foto}`;
-                photoImg.style.display = 'block';
-                const placeholder = photoImg.parentElement?.querySelector('div');
-                if (placeholder) placeholder.style.display = 'none';
+                const panel = document.getElementById('userInfoPanel');
+                const nameEl = document.getElementById('userInfoName');
+                const cargoEl = document.getElementById('userInfoCargo');
+                const idEl = document.getElementById('userInfoId');
+                const photoImg = document.getElementById('userPhotoImg');
+
+                if (panel) panel.classList.add('show');
+                if (nameEl) nameEl.textContent = userData.nombre || userData.nombre_completo || ('Usuario ' + (userData.usuario_id || userData.id || '')); 
+                if (cargoEl) cargoEl.innerHTML = `<i class="fas fa-briefcase"></i> <span>${userData.cargo || ''}</span>`;
+                if (idEl) idEl.textContent = 'ID: ' + (userData.usuario_id || userData.id || '—');
+
+                if (photoImg && userData.foto) {
+                    photoImg.src = userData.foto.startsWith('data:') ? userData.foto : ('data:image/jpeg;base64,' + userData.foto);
+                    photoImg.classList.remove('photo-hidden');
+                    const placeholder = document.querySelector('.photo-placeholder');
+                    if (placeholder) placeholder.style.display = 'none';
+                }
+
+                // Actualizar resumen compacto si existe
+                const compact = document.getElementById('usuarioCreadoCompact');
+                if (compact) {
+                    compact.innerHTML = `
+                        <div style="font-weight:700; font-size:1rem;">${userData.nombre || userData.nombre_completo || ''}</div>
+                        <div style="color:var(--text-secondary); font-size:0.9rem;">${userData.cargo || ''} • ID #${userData.usuario_id || userData.id || ''}</div>
+                    `;
+                }
+
+                // Actualizar campo visible de ID en sección biometría
+                const usuarioIdBioEl = document.getElementById('usuarioIdBio');
+                if (usuarioIdBioEl) usuarioIdBioEl.textContent = userData.usuario_id || userData.id || currentUserId || '';
+
+            } catch (e) {
+                console.warn('actualizarInfoUsuario error:', e);
             }
         }
         
+        function showTab(tabName) {
+            document.querySelectorAll(".tab-content").forEach(t => t.style.display = "none");
+            document.querySelectorAll(".nav-link").forEach(l => l.classList.remove("active"));
+            document.getElementById(tabName + "-tab").style.display = "block";
+            document.querySelector(`[data-section="${tabName}"]`).classList.add("active");
+            
+            // Limpiar panel de información de usuario al cambiar de pestaña (privacidad)
+            const userInfoPanel = document.getElementById("userInfoPanel");
+            if (userInfoPanel) {
+                userInfoPanel.classList.remove('show');
+                userInfoPanel.innerHTML = '';
+            }
+            
+            if (tabName === "validacion") {
+                cargarUltimosAccesos();
+                // Iniciar polling ligero para mostrar accesos en tiempo real
+                try {
+                    if (validacionPollInterval) clearInterval(validacionPollInterval);
+                    validacionPollInterval = setInterval(() => cargarUltimosAccesos(), 2000);
+                } catch(e) { console.warn('start validacion poll failed', e); }
+                // Focus al input oculto para lectores RFID (si existe)
+                try { setTimeout(() => document.getElementById('rfidHiddenInput')?.focus(), 300); } catch(e) {}
+            } else {
+                if (validacionPollInterval) { clearInterval(validacionPollInterval); validacionPollInterval = null; }
+            }
+            if (tabName === "busqueda") buscarUsuarios(); // Cargar todos los usuarios al abrir
+        }
+        async function verificarRFID() {
+            // Crear modal para ingresar RFID
+            const modalHtml = `
+                <div class="modal-backdrop" onclick="cerrarModalRFID()"></div>
+                <div class="modal-dialog" style="max-width: 400px;">
+                    <div style="background: var(--bg-secondary); border-radius: 16px; padding: 2rem; border: 1px solid var(--border);">
+                        <div style="text-align: center; margin-bottom: 1.5rem;">
+                                        <div class="rfid-icon-circle">
+                                            <i class="fas fa-id-card rfid-icon"></i>
+                                        </div>
+                                        <h3 class="rfid-title">Verificación RFID</h3>
+                                        <p class="rfid-subtitle">Ingrese el código de la tarjeta RFID</p>
+                        </div>
+                        
+                        <input 
+                            type="text" 
+                            id="rfidInput" 
+                            placeholder="Ej: ABC123456789"
+                            class="form-control"
+                            autofocus
+                        />
+                        
+                        <div class="rfid-actions">
+                            <button onclick="cerrarModalRFID()" class="btn btn-secondary rfid-action"> <i class="fas fa-times me-2"></i>Cancelar</button>
+                            <button onclick="procesarRFID()" class="btn btn-primary rfid-action"> <i class="fas fa-check me-2"></i>Verificar</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const modalContainer = document.createElement('div');
+            modalContainer.id = 'modalRFID';
+            // marcar como modal para que herede estilos (.modal.show) y backdrop funcione
+            modalContainer.className = 'modal show';
+            modalContainer.innerHTML = modalHtml;
+            document.body.appendChild(modalContainer);
+            
+            // Focus en el input
+            setTimeout(() => document.getElementById('rfidInput')?.focus(), 100);
+            
+            // Enter para verificar (adjuntar con guard)
+            const rfidEl = document.getElementById('rfidInput');
+            if (rfidEl) {
+                rfidEl.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') procesarRFID();
+                });
+            }
+        }
+        
+        function cerrarModalRFID() {
+            const modal = document.getElementById('modalRFID');
+            if (modal) modal.remove();
+            document.body.style.overflow = 'auto';
+        }
+
+        async function procesarRFID() {
+            const tag = document.getElementById('rfidInput')?.value.trim();
+            return procesarRFIDValue(tag);
+        }
+
+        // Procesa un valor de tag RFID (puede venir del modal o de un input oculto)
+        async function procesarRFIDValue(tag) {
+            if (!tag) {
+                const el = document.getElementById('rfidInput');
+                if (el) el.style.borderColor = 'var(--red)';
+                return;
+            }
+
+            // Si existe modal abierto, cerrarlo para mostrar resultado
+            try { cerrarModalRFID(); } catch(e){}
+            showLoading();
+
+            try {
+                const res = await fetch(`${API_URL}/acceso/rfid?rfid_tag=${encodeURIComponent(tag)}`, {
+                    method: 'POST', headers: getAuthHeaders()
+                });
+
+                const text = await res.text().catch(() => '');
+                let data = {};
+                try { data = text ? JSON.parse(text) : {}; } catch (e) { data = { raw: text }; }
+
+                hideLoading();
+                console.log('📥 Respuesta RFID (status ' + res.status + '):', data);
+                if (data && data.raw) console.log('📥 Respuesta RFID (raw text):', data.raw);
+
+                const nested = (data && data.data && typeof data.data === 'object') ? data.data : {};
+                const usuarioId = data.usuario_id || data.id_usuario || data.id || nested.usuario_id || nested.id_usuario || nested.id || null;
+
+                let isSuccess = !!(data.success === true || data.status === true || data.resultado === true);
+                if (!isSuccess && (data.operation === 'create' && data.success !== false)) isSuccess = true;
+                if (!isSuccess && String(data.resultado).toLowerCase() === 'permitido') isSuccess = true;
+
+                data.usuario_id = usuarioId;
+                data.metodo = 'RFID';
+                data.success = isSuccess;
+
+                mostrarModalAcceso(data);
+                try { cargarUltimosAccesos(); } catch(e) {}
+            } catch (err) {
+                hideLoading();
+                console.error('❌ Error procesando RFID:', err);
+                mostrarModalRegistro({ success: false, mensaje: 'Error de conexión: ' + (err.message || err) }, 'Error');
+            }
+        }
+        async function verificarHuella() {
+            mostrarModalRegistro({ 
+                success: false, 
+                mensaje: "Funcionalidad de huella requiere hardware especializado" 
+            }, "Huella Dactilar");
+        }
+
+        // Nuevo flujo: abrir selector y permitir elegir cámara antes de iniciar
+        async function verificarFacial() {
+            verificationType = "acceso";
+            
+            // Resetear estado
+            blinkCount = 0;
+            isVerifying = false;
+            faceDetected = false;
+            document.getElementById("verificationResult").innerHTML = '';
+            document.getElementById("userInfoPanel").classList.remove('show');
+            updateBlinkUI();
+            
+            // Abrir modal y popular lista de cámaras; el usuario iniciará la cámara manualmente
+            abrirModal("cameraModal");
+            await populateCameraList();
+            // Auto-iniciar cámara por defecto para detección en tiempo real (sin pulsar 'Iniciar')
+            try {
+                startCameraWithDevice(null);
+            } catch (e) { console.warn('No se pudo iniciar cámara automáticamente:', e); }
+        }
+
+        // Para registro: igual flujo (usuario elige cámara)
+        async function capturarRostro() {
+            if (!currentUserId) {
+                alert("Primero cree el usuario base");
+                return;
+            }
+            
+            // Para registro, usar captura simple sin liveness (el usuario aún no tiene rostro en BD)
+            verificationType = "registro";
+            document.getElementById("cameraModalTitle").textContent = "Registrar Rostro del Usuario";
+            
+            // Ocultar controles de liveness para registro
+            const livenessEl = document.getElementById("livenessIndicator");
+            if (livenessEl) livenessEl.style.display = "none";
+            const progressEl = document.getElementById("progressContainer");
+            if (progressEl) progressEl.style.display = "none";
+            
+            abrirModal("cameraModal");
+            await populateCameraList();
+            // Para registro queremos iniciar la cámara y mostrar el botón de captura automáticamente
+            try { startCameraWithDevice(null); } catch(e) { console.warn('Auto-start camera for registro failed:', e); }
+        }
+
+        // ===== Gestión de dispositivos de vídeo y arranque por dispositivo seleccionado =====
+        async function populateCameraList() {
+            const select = document.getElementById('cameraSelect');
+            const startBtn = document.getElementById('btnStartCamera');
+            const refreshBtn = document.getElementById('btnRefreshCams');
+
+            if (!select || !startBtn || !refreshBtn) return;
+
+            // Limpiar opciones
+            select.innerHTML = '<option value="">Usar cámara por defecto...</option>';
+
+            async function enumerateAndFill() {
+                try {
+                    let devices = await navigator.mediaDevices.enumerateDevices();
+                    let videoInputs = devices.filter(d => d.kind === 'videoinput');
+
+                    console.info('Listado de dispositivos (raw):', devices); // DEBUG
+
+                    // Si no hay labels (sin permiso), solicitar permiso temporal para obtener nombres
+                    const needsPermission = videoInputs.every(d => !d.label);
+                    if (needsPermission && navigator.mediaDevices.getUserMedia) {
+                        const tmpStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        tmpStream.getTracks().forEach(t => t.stop());
+                        devices = await navigator.mediaDevices.enumerateDevices();
+                        videoInputs = devices.filter(d => d.kind === 'videoinput');
+                    }
+
+                    // Añadir opciones mostrando deviceId parcial para identificar cámaras virtuales
+                    videoInputs.forEach((d, idx) => {
+                        const opt = document.createElement('option');
+                        const shortId = d.deviceId ? d.deviceId.substr(0, 8) : `dev${idx+1}`;
+                        opt.value = d.deviceId;
+                        opt.textContent = d.label ? `${d.label} (${shortId})` : `Cámara ${idx + 1} (${shortId})`;
+                        select.appendChild(opt);
+                    });
+
+                } catch (err) {
+                    console.warn("No se pudieron listar dispositivos de cámara:", err);
+                }
+            }
+
+            // acciones
+            refreshBtn.onclick = () => enumerateAndFill();
+            startBtn.onclick = () => {
+                const deviceId = select.value || null;
+                startCameraWithDevice(deviceId);
+            };
+
+            // Soporta Enter en el select para iniciar
+            select.onkeydown = (e) => { if (e.key === 'Enter') startBtn.click(); };
+
+            await enumerateAndFill();
+        }
+
+        async function startCameraWithDevice(deviceId) {
+            try {
+                // Si ya existe stream, detenerlo antes
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(t => t.stop());
+                    cameraStream = null;
+                }
+
+                const constraintsExact = deviceId
+                    ? { video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } } }
+                    : { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } };
+
+                // Intento principal (con exact si se pasó deviceId)
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia(constraintsExact);
+                } catch (err) {
+                    console.warn('Fallo con constraint exact, intentando fallback sin "exact":', err);
+                    // Fallback: intentar usar deviceId sin exact
+                    const constraintsFallback = deviceId
+                        ? { video: { deviceId: deviceId, width: { ideal: 640 }, height: { ideal: 480 } } }
+                        : { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } };
+                    cameraStream = await navigator.mediaDevices.getUserMedia(constraintsFallback);
+                }
+
+                const video = document.getElementById("cameraVideo");
+                video.srcObject = cameraStream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                    console.log("✅ Video iniciado correctamente con dispositivo:", deviceId || 'default');
+                    // iniciar verificación o mostrar botón de captura según tipo
+                    if (verificationType === "acceso") {
+                        setTimeout(() => iniciarVerificacion(), 300);
+                    } else if (verificationType === "registro") {
+                        document.getElementById("verificationResult").innerHTML = `
+                            <button class="btn btn-success w-100 mt-2" onclick="capturarImagenRegistro()">
+                                <i class="fas fa-camera me-2"></i>Capturar y Registrar Rostro
+                            </button>
+                        `;
+                    }
+                };
+            } catch (err) {
+                console.error("Error al iniciar la cámara seleccionada:", err);
+                try { console.info('Enumerando dispositivos al fallar startCameraWithDevice:'); console.table(await navigator.mediaDevices.enumerateDevices()); } catch(e){}
+                alert("No se pudo iniciar la cámara: " + (err.message || err) + ". Revisa que la cámara virtual de OBS esté activa y que el navegador tenga permisos.");
+            }
+        }
+        
+        // Iniciar detección automática (simulada o real según parche)
+        async function iniciarVerificacion() {
+            if (isVerifying) return;
+            
+            isVerifying = true;
+            blinkCount = 0;
+            previousEyeState = 'open';
+            
+            document.getElementById("verificationResult").innerHTML = '';
+            updateBlinkUI();
+            
+            console.log("🎬 Iniciando detección automática...");
+            
+            // Iniciar detección de parpadeo cada 100ms
+            blinkDetectionInterval = setInterval(detectBlinkAndFace, 100);
+        }
+
+        function detenerVerificacion() {
+            isVerifying = false;
+            
+            if (blinkDetectionInterval) {
+                clearInterval(blinkDetectionInterval);
+                blinkDetectionInterval = null;
+            }
+
+            updateFaceBox('no-face');
+            document.getElementById("userInfoPanel")?.classList.remove('show');
+        }
+
+        // Función principal de detección de parpadeo y rostro (simulada si no hay backend de liveness)
+        async function detectBlinkAndFace() {
+            if (!isVerifying || !cameraStream) return;
+            
+            const video = document.getElementById('cameraVideo');
+            if (!video || !video.videoWidth) return;
+            const canvas = document.getElementById('cameraCanvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            // Simulación mejorada de detección facial para demo
+            const faceDetectedNow = Math.random() > 0.05; // 95% probabilidad
+
+            if (faceDetectedNow) {
+                faceDetected = true;
+                
+                const videoWidth = video.videoWidth;
+                const videoHeight = video.videoHeight;
+                
+                if (currentFaceX === null) {
+                    currentFaceX = videoWidth / 2;
+                    currentFaceY = videoHeight / 2;
+                }
+
+                targetFaceX = videoWidth / 2 + (Math.random() - 0.5) * 60;
+                targetFaceY = videoHeight / 2 + (Math.random() - 0.5) * 40;
+
+                if (currentFaceX === null) {
+                    currentFaceX = targetFaceX;
+                    currentFaceY = targetFaceY;
+                } else {
+                    currentFaceX += (targetFaceX - currentFaceX) * smoothingFactor;
+                    currentFaceY += (targetFaceY - currentFaceY) * smoothingFactor;
+                }
+
+                updateFaceBox('face-detected', {
+                    x: currentFaceX - 80,
+                    y: currentFaceY - 80,
+                    width: 160,
+                    height: 160
+                });
+
+                // Simular detección de ojo/parpadeo
+                const isEyeClosed = Math.random() > 0.85; // 15% cerrado en una iteración
+                if (previousEyeState === 'open' && isEyeClosed) {
+                    previousEyeState = 'closed';
+                    console.log('👁️ Ojo detectado como CERRADO');
+                } else if (previousEyeState === 'closed' && !isEyeClosed) {
+                    blinkCount++;
+                    previousEyeState = 'open';
+                    console.log(`✅ Parpadeo ${blinkCount} detectado!`);
+                    updateBlinkUI();
+                    
+                    if (navigator.vibrate) navigator.vibrate(50);
+                    
+                    if (blinkCount >= requiredBlinks) {
+                        console.log('🎉 Parpadeos completados! Verificando usuario...');
+                        clearInterval(blinkDetectionInterval);
+                        await realizarVerificacionFacial();
+                    }
+                }
+            } else {
+                faceDetected = false;
+                currentFaceX = null;
+                currentFaceY = null;
+                updateFaceBox('no-face');
+            }
+        }
+
         // Realizar verificación facial final (después de parpadeos)
         async function realizarVerificacionFacial() {
             try {
@@ -702,7 +780,8 @@ import API_URL from './api_root.js';
                 formData.append("dispositivo_id", "web_operador_blink");
 
                 if (verificationType === "registro" && currentUserId) {
-                    formData.append("usuario_id", currentUserId);
+                    // Backend espera `id_usuario` en el form
+                    formData.append("id_usuario", currentUserId);
                 }
                 
                 const endpoint = verificationType === "registro" ? "/biometria/create" : "/acceso/camara";
@@ -712,297 +791,46 @@ import API_URL from './api_root.js';
                     body: formData
                 });
                 
-                const data = await response.json();
+                // Intentar parsear JSON de forma tolerante
+                let data = null;
+                try { data = await response.json(); } catch (e) { const text = await response.text(); data = { raw: text }; }
                 
-                console.log("📥 Respuesta del backend:", data); // Debug
+                console.log("📥 Respuesta del backend (verificación facial):", data);
                 
-                if (data.status || data.success) {
+                if (data && (data.status === true || data.success === true)) {
                     updateFaceBox('face-recognized');
-                    
-                    // Obtener datos completos del usuario si solo tenemos el ID
                     let userData = {
-                        nombre: data.nombre || data.nombre_completo || `Usuario ${data.usuario_id}`,
+                        nombre: data.nombre || data.nombre_completo || `Usuario ${data.usuario_id || data.id_usuario}`,
                         cargo: data.cargo || 'Sin especificar',
-                        usuario_id: data.usuario_id || data.id_usuario,
+                        usuario_id: data.usuario_id || data.id_usuario || data.id,
                         foto: data.foto || data.imagen_facial || imageB64
                     };
-                    
-                    // Si solo tenemos ID, consultar datos completos
-                    if (!data.nombre && !data.nombre_completo && data.usuario_id) {
-                        try {
-                            const userRes = await fetch(`${API_URL}/usuarios/all`, { 
-                                headers: getAuthHeaders() 
-                            });
-                            const usersData = await userRes.json();
-                            const users = usersData.data || usersData;
-                            const foundUser = users.find(u => u.id_usuario === data.usuario_id);
-                            
-                            if (foundUser) {
-                                userData = {
-                                    nombre: foundUser.nombre_completo || foundUser.nombre || `Usuario ${data.usuario_id}`,
-                                    cargo: foundUser.cargo || 'Sin especificar',
-                                    usuario_id: data.usuario_id,
-                                    foto: foundUser.imagen_facial || imageB64
-                                };
-                                console.log("✅ Datos de usuario obtenidos:", userData);
-                            }
-                        } catch (err) {
-                            console.warn("⚠️ No se pudieron obtener datos adicionales del usuario");
-                        }
-                    }
-                    
-                    // Actualizar panel de información con datos reales
+
                     actualizarInfoUsuario(userData);
-                    
-                    document.getElementById("verificationResult").innerHTML = `
-                        <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 1.5rem; text-align: center;">
-                            <i class="fas fa-check-circle" style="font-size: 3rem; color: var(--green-400); margin-bottom: 1rem;"></i>
-                            <h3 style="color: var(--green-400); margin-bottom: 0.5rem;">✅ ${verificationType === "registro" ? "Registro Exitoso" : "Acceso Permitido"}</h3>
-                            <p style="color: white; font-size: 1.125rem; margin-bottom: 0.5rem;">${userData.nombre}</p>
-                            <p style="color: var(--slate-300); font-size: 0.875rem;">${userData.cargo} - ID: ${userData.usuario_id}</p>
-                        </div>
-                    `;
-                    
-                    // Esperar 3 segundos para ver la info antes de cerrar
-                    setTimeout(() => {
+
+                    document.getElementById("verificationResult").innerHTML = `\n                        <div class="alert alert-success">\n                            <strong>✅ ${verificationType === "registro" ? "Registro Exitoso" : "Acceso Permitido"}</strong> - ${userData.nombre}\n                        </div>`;
+
+                    setTimeout(async () => {
                         cerrarModal();
-                        
-                        // Mostrar modal informativo según el tipo de operación
                         if (verificationType === "acceso") {
-                            // Pasar datos completos al modal
-                            mostrarModalAcceso({
-                                ...data,
-                                ...userData,
-                                metodo: "Reconocimiento Facial",
-                                foto: userData.foto
-                            });
+                            mostrarModalAcceso({ ...data, ...userData, metodo: "Reconocimiento Facial", foto: userData.foto });
                             cargarUltimosAccesos();
                         } else {
-                            mostrarModalRegistro({
-                                ...data,
-                                ...userData
-                            }, "Reconocimiento Facial");
+                            mostrarModalRegistro({ ...data, ...userData }, "Reconocimiento Facial");
+                            try { await buscarUsuarios(); } catch(e) { console.warn(e); }
+                            try { localStorage.setItem('users_updated', String(Date.now())); } catch(e) {}
                         }
-                    }, 3000);
+                    }, 1200);
                 } else {
                     updateFaceBox('no-face');
-                    document.getElementById("verificationResult").innerHTML = `
-                        <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 1.5rem; text-align: center;">
-                            <i class="fas fa-times-circle" style="font-size: 3rem; color: var(--red-400); margin-bottom: 1rem;"></i>
-                            <h3 style="color: var(--red-400); margin-bottom: 0.5rem;">❌ ${verificationType === "registro" ? "Registro Fallido" : "Acceso Denegado"}</h3>
-                            <p style="color: var(--slate-300); font-size: 0.875rem;">${data.mensaje || data.message || "No se pudo verificar el rostro"}</p>
-                        </div>
-                    `;
-                    
-                    setTimeout(() => {
-                        detenerVerificacion();
-                        // Mostrar modal de error
-                        data.metodo = "Reconocimiento Facial";
-                        if (verificationType === "acceso") {
-                            mostrarModalAcceso(data);
-                        } else {
-                            mostrarModalRegistro(data, "Reconocimiento Facial");
-                        }
-                    }, 2000);
+                    document.getElementById("verificationResult").innerHTML = `\n                        <div class="alert alert-danger">\n                            <strong>❌ ${verificationType === "registro" ? "Registro Fallido" : "Acceso Denegado"}</strong>\n                            <div>${data?.mensaje || data?.message || data?.raw || 'No se pudo verificar el rostro'}</div>\n                        </div>`;
+
+                    setTimeout(() => { detenerVerificacion(); if (verificationType === 'acceso') mostrarModalAcceso({ ...data, metodo: 'Reconocimiento Facial' }); else mostrarModalRegistro(data, 'Reconocimiento Facial'); }, 1500);
                 }
             } catch (error) {
                 console.error('Error en verificación facial:', error);
-                document.getElementById("verificationResult").innerHTML = `
-                    <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 1.5rem; text-align: center;">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: var(--red-400); margin-bottom: 1rem;"></i>
-                        <h3 style="color: var(--red-400);">Error</h3>
-                        <p style="color: var(--slate-300); font-size: 0.875rem;">${error.message || error}</p>
-                    </div>
-                `;
+                document.getElementById("verificationResult").innerHTML = `<div class="alert alert-danger">Error: ${error.message || error}</div>`;
                 detenerVerificacion();
-            }
-        }
-
-        // Captura manual para registro
-        async function capturarImagenRegistro() {
-            const video = document.getElementById("cameraVideo");
-            const canvas = document.getElementById("cameraCanvas");
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext("2d").drawImage(video, 0, 0);
-            const imageB64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
-            
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
-                cameraStream = null;
-            }
-            
-            showLoading();
-            try {
-                const formData = new FormData();
-                formData.append("id_usuario", currentUserId);
-                formData.append("imagen_facial", imageB64);
-                
-                const res = await fetch(`${API_URL}/biometria/create`, {
-                    method: "POST",
-                    headers: getAuthHeaders(),
-                    body: formData
-                });
-                
-                const data = await res.json();
-                
-                if (data.success) {
-                    alert(`✅ Rostro registrado exitosamente para el usuario ${currentUserId}`);
-                    cerrarModal();
-                    document.getElementById("verificationResult").innerHTML = "";
-                } else {
-                    alert("❌ Error: " + (data.message || "No se pudo registrar"));
-                }
-            } catch (err) {
-                alert("Error: " + err.message);
-            } finally {
-                hideLoading();
-            }
-        }
-        
-        async function buscarUsuarios() {
-            const nombre = document.getElementById("searchNombre").value.trim().toLowerCase();
-            const codigo = document.getElementById("searchCodigo").value.trim();
-            const estado = document.getElementById("searchEstado").value;
-            
-            try {
-                // Cargar usuarios y biometrías en paralelo
-                const [resUsuarios, resBiometrias] = await Promise.all([
-                    fetch(`${API_URL}/usuarios/all`, { headers: getAuthHeaders() }),
-                    fetch(`${API_URL}/biometria/all`, { headers: getAuthHeaders() })
-                ]);
-                
-                const dataUsuarios = await resUsuarios.json();
-                const dataBiometrias = await resBiometrias.json();
-                
-                let usuarios = Array.isArray(dataUsuarios) ? dataUsuarios : (dataUsuarios.data || []);
-                const biometrias = Array.isArray(dataBiometrias) ? dataBiometrias : (dataBiometrias.data || []);
-                
-                // Aplicar filtros en tiempo real
-                if (nombre) usuarios = usuarios.filter(u => u.nombre_completo.toLowerCase().includes(nombre));
-                if (codigo) usuarios = usuarios.filter(u => String(u.id_usuario).includes(codigo));
-                if (estado) usuarios = usuarios.filter(u => String(u.estado) === estado);
-                
-                // Limitar a 50 resultados
-                usuarios = usuarios.slice(0, 50);
-                
-                const tbody = document.getElementById("resultadosBusqueda");
-                if (usuarios.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><i class="fas fa-search"></i><p>No se encontraron resultados</p></td></tr>`;
-                    return;
-                }
-                
-                tbody.innerHTML = usuarios.map(u => {
-                    // Buscar biometrías del usuario
-                    const bioUsuario = biometrias.filter(b => b.id_usuario === u.id_usuario);
-                    const rfidData = bioUsuario.find(b => b.tipo_biometria === 'RFID');
-                    const facialData = bioUsuario.find(b => b.tipo_biometria === 'FACIAL');
-                    const huellaData = bioUsuario.find(b => b.tipo_biometria === 'HUELLA');
-                    
-                    return `
-                        <tr>
-                            <td><strong>${u.id_usuario}</strong></td>
-                            <td>${u.nombre_completo}</td>
-                            <td>${u.cargo}</td>
-                            <td>${rfidData ? `<span class="badge badge-info">${rfidData.dato_biometrico || 'Registrado'}</span>` : '<span class="badge badge-secondary">No registrado</span>'}</td>
-                            <td>${facialData ? '<span class="badge badge-success">Activado</span>' : '<span class="badge badge-secondary">Desactivado</span>'}</td>
-                            <td>${huellaData ? '<span class="badge badge-success">Activado</span>' : '<span class="badge badge-secondary">Desactivado</span>'}</td>
-                            <td><span class="badge ${u.estado ? "badge-success" : "badge-danger"}">${u.estado ? "Activo" : "Inactivo"}</span></td>
-                            <td>${u.fecha_registro || '-'}</td>
-                        </tr>
-                    `;
-                }).join("");
-            } catch (err) {
-                console.error("Error buscando usuarios:", err);
-                const tbody = document.getElementById("resultadosBusqueda");
-                tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error cargando datos</p></td></tr>`;
-            }
-        }
-        async function crearUsuarioBase() {
-            const nombre = document.getElementById("regNombre").value.trim();
-            const cargo = document.getElementById("regCargo").value;
-            
-            if (!nombre || !cargo) {
-                mostrarModalRegistro({ success: false, mensaje: "Nombre y cargo son obligatorios" }, "Usuario");
-                return;
-            }
-            
-            showLoading();
-            try {
-                // Valores automáticos
-                const estado = true; // Siempre activo al crear
-                const fecha = new Date().toISOString().split("T")[0]; // Fecha de hoy
-                
-                const formData = new FormData();
-                formData.append("nombre_completo", nombre);
-                formData.append("cargo", cargo);
-                formData.append("estado", estado);
-                formData.append("fecha_registro", fecha);
-                
-                const res = await fetch(`${API_URL}/usuarios/create`, {
-                    method: "POST", 
-                    headers: getAuthHeaders(), 
-                    body: formData
-                });
-                const data = await res.json();
-                
-                console.log("Respuesta del servidor:", data); // Debug
-                
-                hideLoading();
-                
-                if (data.success) {
-                    // Intentar obtener el ID de diferentes formas
-                    let userId = data.data?.id_usuario || data.id_usuario || data.data?.id || null;
-                    
-                    // Si no viene el ID, buscar el último usuario creado
-                    if (!userId) {
-                        console.warn("ID no encontrado en respuesta, buscando último usuario...");
-                        const usuariosRes = await fetch(`${API_URL}/usuarios/all`, { headers: getAuthHeaders() });
-                        const usuariosData = await usuariosRes.json();
-                        const usuarios = Array.isArray(usuariosData) ? usuariosData : (usuariosData.data || []);
-                        
-                        // Buscar el usuario que acabamos de crear por nombre
-                        const usuarioCreado = usuarios.find(u => u.nombre_completo === nombre && u.cargo === cargo);
-                        userId = usuarioCreado?.id_usuario;
-                    }
-                    
-                    if (userId) {
-                        currentUserId = userId;
-                        document.getElementById("usuarioCreado").innerHTML = `
-                            <div class="alert alert-success">
-                                <i class="fas fa-check-circle me-2"></i>
-                                <strong>✅ Usuario creado exitosamente</strong><br>
-                                <div class="mt-2">
-                                    <strong>ID:</strong> ${currentUserId}<br>
-                                    <strong>Nombre:</strong> ${nombre}<br>
-                                    <strong>Cargo:</strong> ${cargo}<br>
-                                    <strong>Estado:</strong> <span class="badge badge-success">Activo</span>
-                                </div>
-                            </div>`;
-                        document.getElementById("usuarioIdBio").textContent = currentUserId;
-                        document.getElementById("seccionBiometria").style.display = "block";
-                        
-                        // Limpiar formulario
-                        document.getElementById("regNombre").value = "";
-                        document.getElementById("regCargo").value = "";
-                        
-                        // Mostrar modal de éxito
-                        mostrarModalRegistro({
-                            success: true,
-                            mensaje: "Usuario registrado correctamente en el sistema",
-                            usuario_id: currentUserId,
-                            nombre: nombre
-                        }, "Usuario Base");
-                    } else {
-                        mostrarModalRegistro({ success: false, mensaje: "Usuario creado pero no se pudo obtener el ID. Recarga la página y busca el usuario." }, "Usuario");
-                    }
-                } else {
-                    mostrarModalRegistro({ success: false, mensaje: data.message || "No se pudo crear usuario" }, "Usuario");
-                }
-            } catch (err) {
-                console.error("Error completo:", err);
-                hideLoading();
-                mostrarModalRegistro({ success: false, mensaje: "Error de conexión: " + err.message }, "Usuario");
             }
         }
         async function registrarRFID() {
@@ -1019,12 +847,11 @@ import API_URL from './api_root.js';
                 
                 console.log("📤 Registrando RFID:", { id_usuario: currentUserId, rfid_tag: rfid });
                 
-                const res = await fetch(`${API_URL}/biometria/create`, {
-                    method: "POST", 
-                    headers: getAuthHeaders(), 
+                const data = await safeFetch(`${API_URL}/biometria/create`, {
+                    method: "POST",
+                    headers: getAuthHeaders(),
                     body: formData
                 });
-                const data = await res.json();
                 
                 console.log("📥 Respuesta RFID:", data);
                 
@@ -1038,6 +865,9 @@ import API_URL from './api_root.js';
                 
                 if (data.success) {
                     document.getElementById("bioRFID").value = ""; // Limpiar input
+                        // Refrescar usuarios y biometrias en la tabla
+                        try { await buscarUsuarios(); } catch(e) { console.warn(e); }
+                    try { localStorage.setItem('users_updated', String(Date.now())); } catch(e) {}
                 }
             } catch (err) {
                 console.error("❌ Error registrando RFID:", err);
@@ -1076,6 +906,29 @@ import API_URL from './api_root.js';
             document.getElementById("searchNombre").addEventListener("input", buscarUsuarios);
             document.getElementById("searchCodigo").addEventListener("input", buscarUsuarios);
             document.getElementById("searchEstado").addEventListener("change", buscarUsuarios);
+
+            // Preparar input oculto para lectores RFID (emulan teclado) en pestaña Validación
+            try {
+                let hidden = document.getElementById('rfidHiddenInput');
+                if (!hidden) {
+                    hidden = document.createElement('input');
+                    hidden.id = 'rfidHiddenInput';
+                    hidden.type = 'text';
+                    hidden.autocomplete = 'off';
+                    hidden.style.position = 'absolute';
+                    hidden.style.left = '-9999px';
+                    hidden.style.width = '1px';
+                    hidden.style.height = '1px';
+                    document.body.appendChild(hidden);
+                }
+                hidden.addEventListener('keydown', async (e) => {
+                    if (e.key === 'Enter') {
+                        const tag = hidden.value.trim();
+                        hidden.value = '';
+                        await procesarRFIDValue(tag);
+                    }
+                });
+            } catch(e) { console.warn('rfid hidden init failed', e); }
         });
         
         /* DEBUG: forzar permiso, listar dispositivos y mostrar settings del track */
@@ -1158,3 +1011,296 @@ async function tryStartByPartialId(partial) {
 // Exponer helpers globalmente para invocarlos desde la consola
 window.listCamerasDebug = listCamerasDebug;
 window.tryStartByPartialId = tryStartByPartialId;
+
+// ===== FUNCIONES FALTANTES (restauradas desde backup) =====
+// Captura manual para registro (imagen) - toma foto del video y la envía como base64
+async function capturarImagenRegistro() {
+    const video = document.getElementById("cameraVideo");
+    const canvas = document.getElementById("cameraCanvas");
+    if (!video || !canvas) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    const imageB64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+    
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+    
+    showLoading();
+    try {
+        const formData = new FormData();
+        formData.append("id_usuario", currentUserId);
+        formData.append("imagen_facial", imageB64);
+        
+        const data = await safeFetch(`${API_URL}/biometria/create`, {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: formData
+        });
+        
+        if (data.success) {
+            alert(`✅ Rostro registrado exitosamente para el usuario ${currentUserId}`);
+            cerrarModal();
+            document.getElementById("verificationResult").innerHTML = "";
+            try { await buscarUsuarios(); } catch(e) { console.warn(e); }
+            try { localStorage.setItem('users_updated', String(Date.now())); } catch(e) {}
+        } else {
+            alert("❌ Error: " + (data.message || "No se pudo registrar"));
+        }
+    } catch (err) {
+        alert("Error: " + err.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Cargar últimos accesos (usa /registros/all y mapea nombres desde /usuarios/all)
+async function cargarUltimosAccesos() {
+    try {
+        const dataReg = await safeFetch(`${API_URL}/registros/all`, { headers: getAuthHeaders() });
+        const dataUsr = await safeFetch(`${API_URL}/usuarios/all`, { headers: getAuthHeaders() });
+
+        const registros = Array.isArray(dataReg) ? dataReg : (dataReg.data || []);
+        const usuarios = Array.isArray(dataUsr) ? dataUsr : (dataUsr.data || []);
+
+        // Ordenar por fecha_hora desc (si existe) y tomar los 10 más recientes
+        registros.sort((a,b) => {
+            const A = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0;
+            const B = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0;
+            return B - A;
+        });
+        const recent = registros.slice(0, 10);
+
+        const tbody = document.getElementById('ultimosAccesos');
+        if (!tbody) return;
+
+        if (!recent.length) {
+            tbody.innerHTML = `<tr><td colspan="4" class="empty-state"><i class="fas fa-inbox"></i><p>No hay registros recientes</p></td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = recent.map(r => {
+            const usuario = usuarios.find(u => Number(u.id_usuario) === Number(r.id_usuario)) || {};
+            const nombre = usuario.nombre_completo || usuario.nombre || (`#${r.id_usuario}`) || 'Desconocido';
+            const fecha = r.fecha_hora ? new Date(r.fecha_hora).toLocaleString('es-ES') : '-';
+            const metodo = r.tipo_acceso || r.tipo || 'Desconocido';
+            const estado = (r.resultado === true) ? '<span class="badge badge-success">Permitido</span>' : '<span class="badge badge-danger">Denegado</span>';
+            return `
+                <tr>
+                    <td>${fecha}</td>
+                    <td>${nombre}</td>
+                    <td>${metodo}</td>
+                    <td>${estado}</td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Error cargando últimos accesos:', err);
+    }
+}
+
+// Búsqueda de usuarios (para pestaña de búsqueda) - carga usuarios y biometrías
+        async function buscarUsuarios() {
+    const nombre = (document.getElementById("searchNombre")?.value || "").trim().toLowerCase();
+    const codigo = (document.getElementById("searchCodigo")?.value || "").trim();
+    const estado = (document.getElementById("searchEstado")?.value || "");
+    try {
+        const dataUsuarios = await safeFetch(`${API_URL}/usuarios/all`, { headers: getAuthHeaders() });
+        const dataBiometrias = await safeFetch(`${API_URL}/biometria/all`, { headers: getAuthHeaders() });
+        let usuarios = Array.isArray(dataUsuarios) ? dataUsuarios : (dataUsuarios.data || []);
+        const biometriasRaw = Array.isArray(dataBiometrias) ? dataBiometrias : (dataBiometrias.data || []);
+
+        // Normalizar biometrias para evitar discrepancias en los nombres de campos devueltos por el backend
+        const biometrias = biometriasRaw.map(b => ({
+            id: b.id || b.id_biometria || null,
+            id_usuario: b.id_usuario || b.usuario_id || b.id || b.idUsuario || null,
+            tipo: (b.tipo_biometria || b.tipo || b.nombre || '').toString().toUpperCase(),
+            dato: b.dato_biometrico || b.dato || b.archivo || b.imagen || b.valor || '',
+            raw: b
+        }));
+
+        if (nombre) usuarios = usuarios.filter(u => (u.nombre_completo || u.nombre || '').toLowerCase().includes(nombre));
+        if (codigo) usuarios = usuarios.filter(u => String(u.id_usuario).includes(codigo));
+        if (estado) usuarios = usuarios.filter(u => String(u.estado) === estado);
+
+        usuarios = usuarios.slice(0, 50);
+
+        const tbody = document.getElementById("resultadosBusqueda");
+        if (!tbody) return;
+        if (usuarios.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><i class="fas fa-search"></i><p>No se encontraron resultados</p></td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = usuarios.map(u => {
+            const uid = u.id_usuario || u.id || u.usuario_id || u.idUsuario;
+            const bioUsuario = biometrias.filter(b => String(b.id_usuario) === String(uid));
+            const rfidData = bioUsuario.find(b => b.tipo.includes('RFID') || (b.dato && b.dato.toString().length > 3));
+            const facialData = bioUsuario.find(b => b.tipo.includes('FACIAL') || (b.dato && b.dato.toString().length > 50));
+            const huellaData = bioUsuario.find(b => b.tipo.includes('HUELLA') || b.tipo.includes('FINGER'));
+
+            return `
+                <tr>
+                    <td><strong>${u.id_usuario}</strong></td>
+                    <td>${u.nombre_completo || u.nombre || '-'}</td>
+                    <td>${u.cargo || '-'}</td>
+                    <td>${rfidData ? `<span class="badge badge-info">${rfidData.dato || 'Registrado'}</span>` : '<span class="badge badge-secondary">No registrado</span>'}</td>
+                    <td>${huellaData ? '<span class="badge badge-success">Activado</span>' : '<span class="badge badge-secondary">Desactivado</span>'}</td>
+                    <td>${facialData ? '<span class="badge badge-success">Activado</span>' : '<span class="badge badge-secondary">Desactivado</span>'}</td>
+                    <td><span class="badge ${u.estado ? "badge-success" : "badge-danger"}">${u.estado ? "Activo" : "Inactivo"}</span></td>
+                    <td>${u.num_accesos || '-'}</td>
+                    <td style="white-space:nowrap;"><button class="btn btn-sm btn-primary" onclick="window.editarUsuarioOperador && window.editarUsuarioOperador(${u.id_usuario})">Editar</button></td>
+                </tr>
+            `;
+        }).join("");
+    } catch (err) {
+        console.error("Error buscando usuarios:", err);
+        const tbody = document.getElementById("resultadosBusqueda");
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error cargando datos</p></td></tr>`;
+    }
+}
+
+
+// Escuchar cambios en localStorage para refrescar listas entre pestañas (admin <-> operador)
+window.addEventListener('storage', (e) => {
+    if (e.key === 'users_updated') {
+        try { buscarUsuarios(); cargarUltimosAccesos(); } catch(err){ console.warn('refresh on storage event failed', err); }
+    }
+});
+// Crear usuario base (restaurada) — similar al backup
+async function crearUsuarioBase() {
+    const nombre = (document.getElementById("regNombre")?.value || "").trim();
+    const cargo = (document.getElementById("regCargo")?.value || "");
+    
+    if (!nombre || !cargo) {
+        mostrarModalRegistro({ success: false, mensaje: "Nombre y cargo son obligatorios" }, "Usuario");
+        return;
+    }
+    
+    showLoading();
+    try {
+        const estado = true;
+        const fecha = new Date().toISOString().split("T")[0];
+        const formData = new FormData();
+        formData.append("nombre_completo", nombre);
+        formData.append("cargo", cargo);
+        formData.append("estado", estado);
+        formData.append("fecha_registro", fecha);
+        
+        const data = await safeFetch(`${API_URL}/usuarios/create`, {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: formData
+        });
+        hideLoading();
+
+        if (data.success) {
+            let userId = data.data?.id_usuario || data.id_usuario || data.data?.id || null;
+            if (!userId) {
+                console.warn("ID no encontrado en respuesta, buscando último usuario...");
+                const usuariosData = await safeFetch(`${API_URL}/usuarios/all`, { headers: getAuthHeaders() });
+                const usuarios = Array.isArray(usuariosData) ? usuariosData : (usuariosData.data || []);
+                const usuarioCreado = usuarios.find(u => (u.nombre_completo || u.nombre) === nombre && u.cargo === cargo);
+                userId = usuarioCreado?.id_usuario;
+            }
+
+            if (userId) {
+                currentUserId = userId;
+                document.getElementById("usuarioCreado").innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>✅ Usuario creado exitosamente</strong><br>
+                        <div class="mt-2">
+                            <strong>ID:</strong> ${currentUserId}<br>
+                            <strong>Nombre:</strong> ${nombre}<br>
+                            <strong>Cargo:</strong> ${cargo}<br>
+                            <strong>Estado:</strong> <span class="badge badge-success">Activo</span>
+                        </div>
+                    </div>`;
+                const usuarioIdBioEl = document.getElementById("usuarioIdBio");
+                if (usuarioIdBioEl) usuarioIdBioEl.textContent = currentUserId;
+                const seccionBiometria = document.getElementById("seccionBiometria");
+                if (seccionBiometria) {
+                    seccionBiometria.classList.remove('d-none');
+                    seccionBiometria.style.display = 'block';
+                }
+                const compact = document.getElementById('usuarioCreadoCompact');
+                if (compact) {
+                    compact.innerHTML = `
+                        <div style="font-weight:700; font-size:1rem;">${nombre}</div>
+                        <div style="color:var(--text-secondary); font-size:0.9rem;">${cargo} • ID #${currentUserId}</div>
+                    `;
+                }
+
+                document.getElementById("regNombre").value = "";
+                document.getElementById("regCargo").value = "";
+
+                mostrarModalRegistro({ success: true, mensaje: "Usuario registrado correctamente en el sistema", usuario_id: currentUserId, nombre: nombre }, "Usuario Base");
+                try { localStorage.setItem('users_updated', String(Date.now())); } catch(e) {}
+            } else {
+                mostrarModalRegistro({ success: false, mensaje: "Usuario creado pero no se pudo obtener el ID. Recarga la página y busca el usuario." }, "Usuario");
+            }
+        } else {
+            mostrarModalRegistro({ success: false, mensaje: data.message || "No se pudo crear usuario" }, "Usuario");
+        }
+    } catch (err) {
+        console.error("Error completo:", err);
+        hideLoading();
+        mostrarModalRegistro({ success: false, mensaje: "Error de conexión: " + err.message }, "Usuario");
+    }
+}
+
+// Abrir flujo de edición/biometría para un usuario existente
+async function editarUsuario(id_usuario) {
+    try {
+        showLoading();
+        const res = await fetch(`${API_URL}/usuarios/all`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const usuarios = Array.isArray(data) ? data : (data.data || []);
+        const usuario = usuarios.find(u => String(u.id_usuario) === String(id_usuario));
+        hideLoading();
+        if (!usuario) {
+            alert('Usuario no encontrado');
+            return;
+        }
+
+        currentUserId = usuario.id_usuario;
+        // Mostrar sección de biometría
+        const seccion = document.getElementById('seccionBiometria');
+        if (seccion) {
+            seccion.classList.remove('d-none');
+            seccion.style.display = 'block';
+        }
+
+        // Mostrar ID y resumen compacto
+        const usuarioIdBioEl = document.getElementById('usuarioIdBio');
+        if (usuarioIdBioEl) usuarioIdBioEl.textContent = currentUserId;
+
+        const compact = document.getElementById('usuarioCreadoCompact');
+        if (compact) {
+            compact.innerHTML = `
+                <div style="font-weight:700; font-size:1rem;">${usuario.nombre_completo || usuario.nombre}</div>
+                <div style="color:var(--text-secondary); font-size:0.9rem;">${usuario.cargo || ''} • ID #${currentUserId}</div>
+            `;
+        }
+
+        // Alternativamente abrir la pestaña de registro
+        try { showTab('registro'); } catch(e){}
+        // Refresh biometrias list (so UI shows current status)
+        try { await buscarUsuarios(); } catch(e){ console.warn(e); }
+        // Scroll to biometrics section
+        setTimeout(() => {
+            const el = document.getElementById('seccionBiometria');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+    } catch (err) {
+        hideLoading();
+        console.error('editarUsuario error:', err);
+        alert('Error al cargar usuario: ' + (err.message || err));
+    }
+}
+// Exponer con nombre específico para evitar colisiones globales con otras páginas
+window.editarUsuarioOperador = editarUsuario;

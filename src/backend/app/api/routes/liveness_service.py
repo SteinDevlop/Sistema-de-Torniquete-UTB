@@ -46,7 +46,7 @@ async def start_liveness_session(session_id: str = Form(...)):
             "success": True,
             "session_id": session_id,
             "message": "Sesión de liveness iniciada. Envíe frames para análisis.",
-            "min_frames": detector.min_frames
+            "min_frames": 3  # Valor fijo, no del detector
         }
         
     except Exception as e:
@@ -115,15 +115,12 @@ async def add_liveness_frame(
 
 
 @app.post("/analyze")
-async def analyze_liveness(session_id: str = Form(...)):
+async def analyze_liveness(
+    session_id: str = Form(...),
+    mode: str = Form("active") # 'active' or 'passive'
+):
     """
     Analiza los frames recibidos y retorna el score de liveness.
-    
-    Args:
-        session_id: ID de la sesión activa
-        
-    Returns:
-        Resultado del análisis de liveness
     """
     try:
         # Verificar que la sesión existe
@@ -136,35 +133,28 @@ async def analyze_liveness(session_id: str = Form(...)):
         session = liveness_sessions[session_id]
         detector = session["detector"]
         
-        # Obtener score de liveness
-        liveness_result = detector.get_liveness_score()
+        # Obtener score de liveness según el modo
+        liveness_result = detector.get_liveness_score(mode=mode)
         
         if liveness_result is None:
             return {
                 "success": False,
-                "message": f"Insuficientes frames para análisis. Recibidos: {session['frames_received']}, requeridos: {detector.min_frames}",
-                "frames_received": session["frames_received"],
-                "min_frames": detector.min_frames
+                "message": f"Insuficientes frames para análisis.",
+                "frames_received": session["frames_received"]
             }
         
         # Limpiar sesión
         del liveness_sessions[session_id]
         
-        logger.info(f"✅ Análisis de liveness completado para sesión {session_id}: {liveness_result.confidence:.3f}")
+        logger.info(f"✅ Análisis de liveness ({mode}) completado: {liveness_result.confidence:.3f}")
         
-        # Convertir todos los valores a tipos nativos de Python para serialización JSON
         return {
             "success": True,
             "is_live": bool(liveness_result.is_live),
             "confidence": round(float(liveness_result.confidence), 4),
-            "confidence_percentage": round(float(liveness_result.confidence) * 100, 2),
-            "motion_score": round(float(liveness_result.motion_score), 4),
-            "texture_score": round(float(liveness_result.texture_score), 4),
-            "depth_score": round(float(liveness_result.depth_score), 4),
-            "details": {k: (int(v) if isinstance(v, (np.integer, np.int32, np.int64)) else 
-                           float(v) if isinstance(v, (np.floating, np.float32, np.float64)) else v) 
-                       for k, v in liveness_result.details.items()},
-            "message": "✅ Persona real detectada" if liveness_result.is_live else "❌ Posible foto o video detectado"
+            "mode": mode,
+            "details": liveness_result.details,
+            "message": "✅ Persona real detectada" if liveness_result.is_live else "❌ Prueba de vida fallida"
         }
         
     except HTTPException:

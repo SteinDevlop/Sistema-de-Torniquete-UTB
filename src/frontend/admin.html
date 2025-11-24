@@ -72,8 +72,8 @@
                     </div>
                     <div class="stat-value" id="totalUsuarios">0</div>
                     <div class="stat-label">Total Usuarios</div>
-                    <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--slate-400);">
-                        <i class="fas fa-user-check" style="color: var(--green-400);"></i> 
+                    <div class="stat-subtext">
+                        <i class="fas fa-user-check icon-success"></i>
                         <span id="usuariosActivos">0</span> activos
                     </div>
                 </div>
@@ -86,8 +86,8 @@
                     </div>
                     <div class="stat-value" id="totalRegistros">0</div>
                     <div class="stat-label">Accesos Hoy</div>
-                    <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--slate-400);">
-                        <i class="fas fa-arrow-up" style="color: var(--green-400);"></i> 
+                    <div class="stat-subtext">
+                        <i class="fas fa-arrow-up icon-success"></i>
                         <span id="porcentajeExito">0</span>% éxito
                     </div>
                 </div>
@@ -100,9 +100,7 @@
                     </div>
                     <div class="stat-value" id="totalBiometria">0</div>
                     <div class="stat-label">Registros Biométricos</div>
-                    <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--slate-400);">
-                        <span id="porcentajeBiometria">0</span>% del total
-                    </div>
+                    <!-- Porcentaje removido: no mostrar % para registros biométricos según preferencia -->
                 </div>
 
                 <div class="stat-card purple">
@@ -113,49 +111,49 @@
                     </div>
                     <div class="stat-value" id="totalTorniquetes">0</div>
                     <div class="stat-label">Torniquetes Activos</div>
-                    <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--slate-400);">
-                        <i class="fas fa-signal" style="color: var(--green-400);"></i> 
+                    <div class="stat-subtext">
+                        <i class="fas fa-signal icon-success"></i>
                         <span id="torniquetesOnline">0</span> en línea
                     </div>
                 </div>
             </div>
 
             <!-- Gráficas -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+            <div class="charts-grid">
                 <!-- Gráfica de métodos de acceso -->
-                <div style="background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px;">
-                    <h3 style="color: var(--slate-200); margin-bottom: 1rem; font-size: 1.125rem;">
-                        <i class="fas fa-chart-pie me-2" style="color: var(--blue-400);"></i>
+                <div class="chart-panel">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-pie me-2 icon-blue"></i>
                         Métodos de Autenticación
                     </h3>
-                    <canvas id="chartMetodos" style="max-height: 250px;"></canvas>
+                    <canvas id="chartMetodos" class="chart-canvas"></canvas>
                 </div>
 
                 <!-- Gráfica de accesos por día -->
-                <div style="background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px;">
-                    <h3 style="color: var(--slate-200); margin-bottom: 1rem; font-size: 1.125rem;">
-                        <i class="fas fa-chart-line me-2" style="color: var(--green-400);"></i>
+                <div class="chart-panel">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-line me-2 icon-green"></i>
                         Accesos - Últimos 7 Días
                     </h3>
-                    <canvas id="chartAccesos" style="max-height: 250px;"></canvas>
+                    <canvas id="chartAccesos" class="chart-canvas"></canvas>
                 </div>
 
                 <!-- Gráfica de estado de usuarios -->
-                <div style="background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px;">
-                    <h3 style="color: var(--slate-200); margin-bottom: 1rem; font-size: 1.125rem;">
-                        <i class="fas fa-chart-bar me-2" style="color: var(--amber-400);"></i>
+                <div class="chart-panel">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-bar me-2 icon-amber"></i>
                         Estado de Usuarios
                     </h3>
-                    <canvas id="chartEstados" style="max-height: 250px;"></canvas>
+                    <canvas id="chartEstados" class="chart-canvas"></canvas>
                 </div>
 
                 <!-- Gráfica de éxito/fallo -->
-                <div style="background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px;">
-                    <h3 style="color: var(--slate-200); margin-bottom: 1rem; font-size: 1.125rem;">
-                        <i class="fas fa-chart-donut me-2" style="color: var(--purple-400);"></i>
+                <div class="chart-panel">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-donut me-2 icon-purple"></i>
                         Tasa de Éxito
                     </h3>
-                    <canvas id="chartExito" style="max-height: 250px;"></canvas>
+                    <canvas id="chartExito" class="chart-canvas"></canvas>
                 </div>
             </div>
         </section>
@@ -171,8 +169,8 @@
             </div>
 
             <!-- ===== FILTROS DE BÚSQUEDA ===== -->
-            <div style="background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+            <div class="chart-panel filter-panel-inline">
+                <div class="filters-grid">
                     <!-- Búsqueda por nombre -->
                     <div>
                         <label class="form-label">
@@ -208,8 +206,8 @@
                     </div>
                     
                     <!-- Botón limpiar -->
-                    <div style="display: flex; align-items: flex-end;">
-                        <button class="btn btn-sm" onclick="limpiarFiltros()" style="width: 100%; background: rgba(71, 85, 105, 0.5); color: white;">
+                    <div class="filters-actions">
+                        <button class="btn btn-sm btn-filter" onclick="limpiarFiltros()">
                             <i class="fas fa-eraser me-2"></i>Limpiar Filtros
                         </button>
                     </div>
@@ -233,7 +231,7 @@
                     </thead>
                     <tbody id="tablaUsuarios">
                         <tr>
-                            <td colspan="9" style="text-align: center; padding: 2rem; color: var(--slate-500);">
+                            <td colspan="9" class="table-empty-cell">
                                 <i class="fas fa-spinner fa-spin"></i> Cargando usuarios...
                             </td>
                         </tr>
@@ -262,7 +260,7 @@
                     </thead>
                     <tbody id="tablaRegistros">
                         <tr>
-                            <td colspan="6" style="text-align: center; padding: 2rem; color: var(--slate-500);">
+                            <td colspan="6" class="table-empty-cell">
                                 <i class="fas fa-spinner fa-spin"></i> Cargando registros...
                             </td>
                         </tr>
@@ -295,7 +293,7 @@
                     </thead>
                     <tbody id="tablaTorniquetes">
                         <tr>
-                            <td colspan="6" style="text-align: center; padding: 2rem; color: var(--slate-500);">
+                            <td colspan="6" class="table-empty-cell">
                                 <i class="fas fa-spinner fa-spin"></i> Cargando torniquetes...
                             </td>
                         </tr>

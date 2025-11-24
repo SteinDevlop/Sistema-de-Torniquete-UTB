@@ -46,20 +46,13 @@ class FaceRecognitionSystem:
             bool: True si se detectó un rostro, False en caso contrario
         """
         try:
-            # Guardar temporalmente la imagen
-            temp_file = os.path.join(tempfile.gettempdir(), 'temp_face.jpg')
-            cv2.imwrite(temp_file, image)
-            
-            # Detectar rostros usando DeepFace
+            # Detectar rostros usando DeepFace directamente con el array
+            # DeepFace soporta numpy arrays como entrada para img_path
             faces = DeepFace.extract_faces(
-                img_path=temp_file,
+                img_path=image,
                 detector_backend=self.detector_backend,
                 enforce_detection=False
             )
-            
-            # Limpiar archivo temporal
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
             
             return len(faces) > 0 and faces[0]['confidence'] > 0.9
             
@@ -78,21 +71,13 @@ class FaceRecognitionSystem:
             np.ndarray: Vector de características o None si no se detectó rostro
         """
         try:
-            # Guardar temporalmente la imagen
-            temp_file = os.path.join(tempfile.gettempdir(), 'temp_face.jpg')
-            cv2.imwrite(temp_file, image)
-            
-            # Extraer embedding usando DeepFace
+            # Extraer embedding usando DeepFace directamente con el array
             embedding_objs = DeepFace.represent(
-                img_path=temp_file,
+                img_path=image,
                 model_name=self.model_name,
                 detector_backend=self.detector_backend,
                 enforce_detection=True  # Forzar detección de rostro
             )
-            
-            # Limpiar archivo temporal
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
             
             if len(embedding_objs) > 0:
                 embedding = np.array(embedding_objs[0]['embedding'])
@@ -104,13 +89,6 @@ class FaceRecognitionSystem:
             
         except Exception as e:
             logger.error(f"Error al extraer embedding: {e}")
-            # Limpiar archivo temporal en caso de error
-            temp_file = os.path.join(tempfile.gettempdir(), 'temp_face.jpg')
-            if os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except:
-                    pass
             return None
     
     def extraer_embedding_desde_base64(self, imagen_b64: str) -> Optional[np.ndarray]:

@@ -107,7 +107,7 @@
                     <div class="col-md-6">
                         <h5>Cámara en Vivo</h5>
                         <video id="videoRegister" width="100%" height="auto" autoplay></video>
-                        <canvas id="canvasRegister" style="display:none;"></canvas>
+                        <canvas id="canvasRegister" class="d-none"></canvas>
                     </div>
                     <div class="col-md-6">
                         <h5>Información del Registro</h5>
@@ -137,13 +137,13 @@
                     <div class="col-md-6">
                         <h5>Cámara en Vivo</h5>
                         <video id="videoVerify" width="100%" height="auto" autoplay></video>
-                        <canvas id="canvasVerify" style="display:none;"></canvas>
+                        <canvas id="canvasVerify" class="d-none"></canvas>
                         
                         <!-- Indicador de Liveness -->
-                        <div id="livenessIndicator" style="display:none;"></div>
+                        <div id="livenessIndicator" class="d-none"></div>
                         
                         <!-- Progreso de captura de frames -->
-                        <div id="progressContainer" style="display:none;" class="mt-3">
+                        <div id="progressContainer" class="d-none mt-3">
                             <label>Analizando frames: <span id="frameCount">0</span> / <span id="minFrames">10</span></label>
                             <div class="progress">
                                 <div id="frameProgress" class="progress-bar progress-bar-striped progress-bar-animated" 

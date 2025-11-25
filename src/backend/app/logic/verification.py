@@ -38,91 +38,100 @@ class VerificadorRFID:
         except Exception as e:
             logger.exception("Error buscando RFID en la DB: %s", e)
             return False, None
+
 class VerificadorHuella:
     """
-    Verifica una huella dactilar contra los templates almacenados.
-    Soporta tanto templates tipo imagen (SSIM) como vectores (correlación).
+    Verificador para fingerprints provenientes del sensor AS608.
+    Los templates llegan en formato binario (base64).
     """
 
-    def __init__(self, umbral_imagen=0.85, umbral_vector=0.98):
-        self.umbral_imagen = umbral_imagen
-        self.umbral_vector = umbral_vector
+    UMBRAL_MATCH = 0.90  # 90%
 
-    def _decode_image(self, b64_data: str):
-        """Intenta decodificar el base64 como imagen (grayscale)."""
+    def _decode_template(self, b64_data: str) -> bytes | None:
         try:
-            data = base64.b64decode(b64_data)
-            np_data = np.frombuffer(data, np.uint8)
-            img = cv2.imdecode(np_data, cv2.IMREAD_GRAYSCALE)
-            return img
-        except Exception:
+            padded = b64_data + '=' * (-len(b64_data) % 4)
+            raw = base64.b64decode(padded)
+            logger.debug(f"[DECODE] Base64 length={len(b64_data)}, padded={len(padded)}, bytes={len(raw)}")
+            return raw
+        except Exception as e:
+            logger.error(f"[DECODE ERROR] No se pudo decodificar base64: {e}")
             return None
 
-    def _decode_vector(self, b64_data: str):
-        """Decodifica el base64 como vector de bytes."""
-        try:
-            data = base64.b64decode(b64_data)
-            return np.frombuffer(data, dtype=np.uint8).astype(np.float32)
-        except Exception:
-            return None
+    def _similaridad_templates(self, t1: bytes, t2: bytes) -> float:
+        l1, l2 = len(t1), len(t2)
+        logger.debug(f"[SIMILITUD] len(t1)={l1}, len(t2)={l2}")
 
-    def _similitud_vectorial(self, v1: np.ndarray, v2: np.ndarray) -> float:
-        """Calcula similitud por correlación normalizada."""
-        min_len = min(len(v1), len(v2))
-        if min_len == 0:
+        if l1 == 0 or l2 == 0:
             return 0.0
-        v1, v2 = v1[:min_len], v2[:min_len]
-        return np.corrcoef(v1, v2)[0, 1]
+
+        min_len = min(l1, l2)
+        iguales = sum(b1 == b2 for b1, b2 in zip(t1[:min_len], t2[:min_len]))
+
+        logger.debug(f"[SIMILITUD] bytes_iguales={iguales}, comparados={min_len}")
+        return iguales / min_len
 
     def verificar(self, data: dict) -> tuple[bool, int | None]:
-        """
-        Verifica si la huella enviada coincide con alguna en la DB.
-        Retorna (True, id_usuario) o (False, None)
-        """
-        vector_in_b64 = data.get("vector")
-        if not vector_in_b64:
+        logger.info("INICIANDO VERIFICACION DE HUELLA ===")
+
+        tpl_in = data.get("vector") or data.get("template")
+        logger.debug(f"[INPUT] Template recibido: {tpl_in[:50]}... (len={len(tpl_in) if tpl_in else 0})")
+
+        if not tpl_in:
+            logger.warning("[INPUT] No se recibió template")
             return False, None
 
-        # 1️⃣ Intentar decodificar como imagen
-        img_sensor = self._decode_image(vector_in_b64)
-        usar_vector = img_sensor is None
+        tpl_sensor = self._decode_template(tpl_in)
+        if tpl_sensor is None:
+            logger.error("[INPUT] No se pudo decodificar el template recibido")
+            return False, None
+
+        logger.debug(f"[INPUT] Bytes sensor: {tpl_sensor[:20]}... total={len(tpl_sensor)}")
 
         registros_db = universal_controller.read_all(BiometriaOut())
-        if not registros_db:
-            return False, None
+        logger.debug(f"[DB] Se cargaron {len(registros_db)} registros biométricos")
 
-        mejor_score = 0.0
+        mejor_score = 0
         mejor_id = None
 
         for registro in registros_db:
-            tpl_b64 = registro.get("template_huella")
-            if not tpl_b64:
+            tpl_b64_db = registro.get("template_huella")
+            uid = registro.get("id_usuario")
+
+            if not tpl_b64_db:
+                logger.debug(f"[DB] Usuario {uid} sin template de huella, se omite")
                 continue
 
-            if usar_vector:
-                # === Comparación tipo vector ===
-                v1 = self._decode_vector(vector_in_b64)
-                v2 = self._decode_vector(tpl_b64)
-                if v1 is None or v2 is None:
-                    continue
-                score = self._similitud_vectorial(v1, v2)
-                umbral = self.umbral_vector
-            else:
-                # === Comparación tipo imagen ===
-                img_db = self._decode_image(tpl_b64)
-                if img_db is None:
-                    continue
-                h, w = img_sensor.shape
-                img_db = cv2.resize(img_db, (w, h))
-                score = ssim(img_sensor, img_db)
-                umbral = self.umbral_imagen
+            logger.debug(f"[DB] Comparando contra usuario {uid}")
+            tpl_db = self._decode_template(tpl_b64_db)
+
+            if tpl_db is None:
+                logger.error(f"[DB] Error decodificando template del usuario {uid}")
+                continue
+
+            logger.debug(f"[DB] Bytes BD: {tpl_db[:20]}... total={len(tpl_db)}")
+
+            # CASO 1 — COINCIDENCIA EXACTA
+            if tpl_db == tpl_sensor:
+                logger.info(f"🎯 MATCH PERFECTO — Usuario {uid}")
+                return True, uid
+
+            # CASO 2 — COMPARACIÓN DE SIMILITUD
+            score = self._similaridad_templates(tpl_sensor, tpl_db)
+            logger.debug(f"[SCORE] Usuario {uid}: score={score:.4f}")
 
             if score > mejor_score:
                 mejor_score = score
-                mejor_id = registro["id_usuario"]
+                mejor_id = uid
 
-        print(f"[DEBUG] Mejor similitud: {mejor_score:.3f} (modo {'vector' if usar_vector else 'imagen'})")
-        return (mejor_score >= umbral, mejor_id if mejor_score >= umbral else None)
+        logger.info(f"[RESULTADO] Mejor score={mejor_score:.4f} (umbral={self.UMBRAL_MATCH})")
+
+        if mejor_score >= self.UMBRAL_MATCH:
+            logger.info(f"MATCH POR SIMILITUD — Usuario {mejor_id}")
+            return True, mejor_id
+
+        logger.warning("Ningún template alcanzó el umbral")
+        return False, None
+
 
 class VerificadorCamara(VerificadorAcceso):
     """

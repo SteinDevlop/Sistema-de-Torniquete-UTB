@@ -7,6 +7,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Nuevo import para activar la UTA cuando el acceso facial sea exitoso
+from backend.app.api.routes import dep_access
+
 app = APIRouter(tags=["Acceso"])
 
 @app.post("/acceso/rfid", response_model=AccesoResponse)
@@ -80,5 +83,10 @@ async def solicitar_acceso_camara(
     
     response = AccessService.solicitar_acceso(request)
     logger.info(f"Respuesta de verificación facial: status={response.status}, usuario_id={response.usuario_id}, mensaje={response.mensaje}")
-    
+    # Normalizar el valor de status para aceptar True (boolean), "True"/"true" (str), etc.
+    if str(response.status).lower() == "true":
+         try:
+             await dep_access.permitir_cara()
+         except Exception as e:
+             logger.warning(f"No se pudo activar la UTA tras acceso exitoso: {e}")
     return response

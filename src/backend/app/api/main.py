@@ -1,6 +1,7 @@
 import os
 import warnings
 import logging
+import asyncio
 
 # ==========================================
 # CONFIGURACIÓN DE WARNINGS Y LOGS
@@ -32,6 +33,7 @@ from backend.app.logic.universal_controller_instance import universal_controller
 from backend.app.api.routes import access_service
 from backend.app.api.routes import liveness_service
 from backend.app.api.routes import auth
+from backend.app.api.routes import dep_access 
 from backend.app.api.routes.biometria import biometria_cud, biometria_query
 from backend.app.api.routes.historial_estado_usuario import historial_estado_usuario_cud, historial_estado_usuario_query
 from backend.app.api.routes.usuarios import usuarios_cud, usuarios_query
@@ -49,7 +51,7 @@ async def lifespan(app: FastAPI):
     print("Conexión establecida con la base de datos")
 
     try:
-        yield  # 👈 Aquí se ejecuta la app mientras está viva
+        yield  # 👈 Aquí se ejecaccess la app mientras está viva
     finally:
         # ===== SHUTDOWN =====
         if hasattr(universal_controller, "conn") and universal_controller.conn:
@@ -89,3 +91,6 @@ app.include_router(registros_cud.app)
 app.include_router(registros_query.app)
 app.include_router(torniquetes_cud.app)
 app.include_router(torniquetes_query.app)
+
+# Incluir el router que maneja la UTA/torniquete por cara
+app.include_router(dep_access.app)

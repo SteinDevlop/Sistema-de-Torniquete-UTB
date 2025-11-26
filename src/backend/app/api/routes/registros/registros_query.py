@@ -21,20 +21,3 @@ def get_registros_by_id(request: Request, id_registro: int = Query(...)):
         return unit.model_dump()
     else:
         return None
-@app.get("/last_by_time/{id}",    summary="Obtener el último registro por tiempo",
-    description="""
-Devuelve el registro más reciente asociado a un ID de torniquete.
-
-### Detalles:
-- Busca por ID torniquete.
-- Ordena los registros por fecha.
-- Devuelve solo el más reciente.
-
-Si no encuentra ningún registro, responde con **404**.
-"""
-)
-def get_last_registro_by_time(id: int):
-    record = controller.get_last_by_time(RegistrosOut, id)
-    if record:
-        return record
-    raise HTTPException(status_code=404, detail="Registro no encontrado")

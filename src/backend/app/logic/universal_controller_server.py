@@ -143,3 +143,12 @@ class UniversalController:
         self.cursor.execute(sql, (like_pattern,))
         rows = self.cursor.fetchall()
         return [dict(row) for row in rows]
+    def get_last_by_time(self, model, id_torniquete: int) -> dict | None:
+        """Retrieve the last record by time for a given ID torniquete."""
+        
+        self._ensure_table_exists(model)
+        table = model.__entity_name__
+        sql = f"SELECT * FROM {table} WHERE id_torniquete = ? ORDER BY fecha_hora DESC LIMIT 1"
+        self.cursor.execute(sql, (id_torniquete,))
+        rows = self.cursor.fetchall()
+        return [dict(row) for row in rows]
